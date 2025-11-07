@@ -1,0 +1,8 @@
+google-generativeai>=0.8.3
+pinecone
+requests>=2.32.3
+tiktoken>=0.7.0
+backoff>=2.2.1
+orjson>=3.10.7
+python-dotenv>=1.0.1
+Pillow>=10.4.0

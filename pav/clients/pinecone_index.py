@@ -1,234 +1,130 @@
 # pav/clients/pinecone_index.py
 
-import logging
 import os
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Dict, List, Optional
 
-from pinecone import Pinecone, ServerlessSpec
-
-from pav.clients.embeddings import embed as _embed
-
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------
-# Pinecone client + index init
-# ---------------------------------------------------------------------
+from pinecone import Pinecone
+from pav.clients.embeddings import embed
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
-PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
-
-# Support both env names; prefer PINECONE_INDEX
-INDEX_NAME = os.getenv("PINECONE_INDEX") or os.getenv("PINECONE_INDEX_NAME")
-
-INDEX = None
+PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX") or os.getenv("PINECONE_INDEX_NAME")
 
 if not PINECONE_API_KEY:
-    logger.error("PINECONE_API_KEY is not set – Pinecone operations will fail.")
+    raise RuntimeError("PINECONE_API_KEY is not set")
+
+pc = Pinecone(api_key=PINECONE_API_KEY)
+
+if not PINECONE_INDEX_NAME:
+    INDEX = None
+    print("PINECONE_INDEX_NAME / PINECONE_INDEX is not set – cannot create Index handle.")
 else:
-    pc = Pinecone(api_key=PINECONE_API_KEY)
-
-    if not INDEX_NAME:
-        logger.error(
-            "PINECONE_INDEX / PINECONE_INDEX_NAME is not set – "
-            "Pinecone index handle will not be initialized."
-        )
-    else:
-        # Gemini text-embedding-004 is 768-dim
-        dim = 768
-
-        try:
-            existing_names = pc.list_indexes().names()
-        except Exception as e:
-            logger.error("Failed to list Pinecone indexes: %s", e)
-            existing_names = []
-
-        if INDEX_NAME not in existing_names:
-            logger.info(
-                "Creating Pinecone index '%s' (dim=%d, cloud=%s, region=%s)...",
-                INDEX_NAME,
-                dim,
-                PINECONE_CLOUD,
-                PINECONE_REGION,
-            )
-            try:
-                pc.create_index(
-                    name=INDEX_NAME,
-                    dimension=dim,
-                    metric="cosine",
-                    spec=ServerlessSpec(
-                        cloud=PINECONE_CLOUD,
-                        region=PINECONE_REGION,
-                    ),
-                )
-            except Exception as e:
-                logger.error("Failed to create Pinecone index '%s': %s", INDEX_NAME, e)
-
-        try:
-            INDEX = pc.Index(INDEX_NAME)
-        except Exception as e:
-            logger.error("Failed to get Pinecone index handle '%s': %s", INDEX_NAME, e)
-            INDEX = None
+    INDEX = pc.Index(PINECONE_INDEX_NAME)
 
 
-# ---------------------------------------------------------------------
-# Vector normalization
-# ---------------------------------------------------------------------
-
-
-def _normalize_vector(vec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+def _extract_primary_text(bundle: Dict) -> str:
     """
-    Take an arbitrary 'vector-like' dict and return one that Pinecone accepts.
+    Decide what text to embed.
 
-    Allowed top-level keys: id, values, metadata, sparse_values.
-
-    Behaviour:
-    - If 'values' is missing or empty, we build an embedding from whatever
-      text we can find (text, text_main, metadata.content, metadata.narrative,
-      metadata.caption, metadata.vision_summary, metadata.html).
-    - We also make sure that the main text we embedded is stored in
-      metadata["content"] so *all content* lives in Pinecone.
-    - If we still have no usable text, return None (caller will skip).
+    - For images/tables: prefer metadata['narrative'] if present.
+    - Otherwise: fall back to bundle['text'].
     """
-    vid = vec.get("id")
-    if not vid:
-        logger.warning("Skipping vector without 'id': %r", vec)
-        return None
+    md = bundle.get("metadata") or {}
+    kind = (md.get("kind") or "").lower()
 
-    values = vec.get("values")
-    has_values = isinstance(values, list) and len(values) > 0
+    if kind in ("image", "figure", "table"):
+        nar = (md.get("narrative") or "").strip()
+        if nar:
+            return nar
 
-    # Collect potential text *once* – we will also store it in metadata
-    text_candidates: List[str] = []
-
-    t = vec.get("text")
-    if isinstance(t, str):
-        text_candidates.append(t)
-
-    t = vec.get("text_main")
-    if isinstance(t, str):
-        text_candidates.append(t)
-
-    meta = vec.get("metadata") or {}
-    if isinstance(meta, dict):
-        for key in ("content", "narrative", "caption", "vision_summary", "html"):
-            mt = meta.get(key)
-            if isinstance(mt, str):
-                text_candidates.append(mt)
-
-    joined = "\n\n".join(
-        s.strip() for s in text_candidates if isinstance(s, str) and s.strip()
-    )
-
-    # If there is no embedding yet, but we have text, embed it
-    if not has_values:
-        if not joined:
-            logger.warning("No text to embed for id=%s; skipping vector.", vid)
-            return None
-
-        try:
-            values = _embed([joined])[0]
-            has_values = True
-        except Exception as e:
-            logger.error("Embedding failed for id=%s: %s", vid, e)
-            return None
-
-    if not has_values:
-        return None
-
-    # Ensure metadata exists and *store content* in it
-    meta_out: Dict[str, Any] = meta if isinstance(meta, dict) else {}
-
-    # If there isn't already a strong content field, write the joined text
-    if joined:
-        if not any(k in meta_out for k in ("content", "full_text", "page_text")):
-            meta_out["content"] = joined
-
-    cleaned: Dict[str, Any] = {
-        "id": vid,
-        "values": values,
-        "metadata": meta_out,
-    }
-
-    if "sparse_values" in vec:
-        cleaned["sparse_values"] = vec["sparse_values"]
-
-    return cleaned
+    raw = (bundle.get("text") or "").strip()
+    return raw
 
 
-# ---------------------------------------------------------------------
-# Upsert
-# ---------------------------------------------------------------------
-
-
-def upsert(doc_id: str, vectors: Iterable[Dict[str, Any]], batch_size: int = 100) -> None:
+def _to_pinecone_vectors(doc_id: str, bundles: List[Dict]) -> List[Dict]:
     """
-    Upsert an iterable of vector dicts into Pinecone under namespace=doc_id.
-
-    Accepts both:
-    - fully-formed Pinecone vectors (id, values, metadata), or
-    - IR-style dicts with 'id' and 'text'/metadata only; we will embed and
-      copy the text into metadata["content"].
+    Convert internal bundles to Pinecone vector dicts:
+      { "id": ..., "values": [...], "metadata": {...} }
     """
-    if INDEX is None:
-        logger.error("Pinecone index handle is not initialized; cannot upsert.")
-        return
+    vectors: List[Dict] = []
 
-    batch: List[Dict[str, Any]] = []
-    total = 0
+    ids: List[str] = []
+    metas: List[Dict] = []
+    texts: List[str] = []
 
-    for vec in vectors:
-        norm = _normalize_vector(vec)
-        if norm is None:
+    for b in bundles:
+        vid = b["id"]
+        md = b.get("metadata", {}) or {}
+
+        content_text = _extract_primary_text(b)
+        if not content_text:
             continue
 
-        batch.append(norm)
+        # store the final text we actually index
+        md["content"] = content_text
 
-        if len(batch) >= batch_size:
-            INDEX.upsert(vectors=batch, namespace=doc_id)
-            total += len(batch)
-            logger.info("Upserted %d vectors so far into namespace=%s", total, doc_id)
-            batch = []
+        ids.append(vid)
+        metas.append(md)
+        texts.append(content_text)
 
-    if batch:
-        INDEX.upsert(vectors=batch, namespace=doc_id)
-        total += len(batch)
-        logger.info("Upserted %d vectors total into namespace=%s", total, doc_id)
-
-
-# ---------------------------------------------------------------------
-# Simple search wrapper
-# ---------------------------------------------------------------------
-
-
-def search(
-    doc_id: str,
-    query_vec: List[float],
-    top_k: int = 5,
-    include_metadata: bool = True,
-) -> List[Dict[str, Any]]:
-    """
-    Query Pinecone with a vector and return matches as simple dicts.
-    """
-    if INDEX is None:
-        logger.error("Pinecone index handle is not initialized; cannot search.")
+    if not texts:
         return []
 
-    res = INDEX.query(
-        namespace=doc_id,
-        vector=query_vec,
-        top_k=top_k,
-        include_metadata=include_metadata,
-    )
+    embs = embed(texts)  # list[list[float]]
 
-    matches_out: List[Dict[str, Any]] = []
-    for m in res.matches:
-        matches_out.append(
+    for vid, md, vals in zip(ids, metas, embs):
+        if not vals or len(vals) == 0:
+            continue
+        vectors.append(
             {
-                "id": m.id,
-                "score": m.score,
-                "metadata": getattr(m, "metadata", {}) or {},
+                "id": vid,
+                "values": vals,
+                "metadata": md,
             }
         )
 
-    return matches_out
+    return vectors
+
+
+def upsert(doc_id: str, bundles: List[Dict]) -> None:
+    """
+    Upsert all vectors for a given document into Pinecone under namespace=doc_id.
+    """
+    if INDEX is None:
+        raise RuntimeError("Pinecone index handle not configured; cannot upsert.")
+
+    vectors = _to_pinecone_vectors(doc_id, bundles)
+    if not vectors:
+        print(f"[PINECONE] No vectors to upsert for {doc_id}")
+        return
+
+    batch_size = 100
+    for i in range(0, len(vectors), batch_size):
+        batch = vectors[i : i + batch_size]
+        INDEX.upsert(vectors=batch, namespace=doc_id)
+
+    print(f"[PINECONE] Upserted {len(vectors)} vectors for {doc_id}")
+
+
+def search(
+    query: str,
+    top_k: int = 5,
+    namespace: Optional[str] = None,
+    filter: Optional[Dict] = None,
+):
+    """
+    Simple wrapper so pav.clients.retrieval.search can import `search`.
+
+    Returns Pinecone matches with metadata.
+    """
+    if INDEX is None:
+        raise RuntimeError("Pinecone index handle not configured; cannot search.")
+
+    vec = embed([query])[0]
+    res = INDEX.query(
+        vector=vec,
+        top_k=top_k,
+        namespace=namespace,
+        filter=filter,
+        include_metadata=True,
+    )
+    return res.matches

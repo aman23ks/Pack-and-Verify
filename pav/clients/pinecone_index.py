@@ -18,7 +18,7 @@ PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
 PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
 
-# Support both names; prefer PINECONE_INDEX if present
+# Support both env names; prefer PINECONE_INDEX
 INDEX_NAME = os.getenv("PINECONE_INDEX") or os.getenv("PINECONE_INDEX_NAME")
 
 INDEX = None
@@ -86,6 +86,8 @@ def _normalize_vector(vec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     - If 'values' is missing or empty, we build an embedding from whatever
       text we can find (text, text_main, metadata.content, metadata.narrative,
       metadata.caption, metadata.vision_summary, metadata.html).
+    - We also make sure that the main text we embedded is stored in
+      metadata["content"] so *all content* lives in Pinecone.
     - If we still have no usable text, return None (caller will skip).
     """
     vid = vec.get("id")
@@ -96,30 +98,30 @@ def _normalize_vector(vec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     values = vec.get("values")
     has_values = isinstance(values, list) and len(values) > 0
 
+    # Collect potential text *once* – we will also store it in metadata
+    text_candidates: List[str] = []
+
+    t = vec.get("text")
+    if isinstance(t, str):
+        text_candidates.append(t)
+
+    t = vec.get("text_main")
+    if isinstance(t, str):
+        text_candidates.append(t)
+
+    meta = vec.get("metadata") or {}
+    if isinstance(meta, dict):
+        for key in ("content", "narrative", "caption", "vision_summary", "html"):
+            mt = meta.get(key)
+            if isinstance(mt, str):
+                text_candidates.append(mt)
+
+    joined = "\n\n".join(
+        s.strip() for s in text_candidates if isinstance(s, str) and s.strip()
+    )
+
+    # If there is no embedding yet, but we have text, embed it
     if not has_values:
-        # Collect text candidates
-        text_candidates: List[str] = []
-
-        t = vec.get("text")
-        if isinstance(t, str):
-            text_candidates.append(t)
-
-        t = vec.get("text_main")
-        if isinstance(t, str):
-            text_candidates.append(t)
-
-        meta = vec.get("metadata") or {}
-        if isinstance(meta, dict):
-            for key in ("content", "narrative", "caption", "vision_summary", "html"):
-                mt = meta.get(key)
-                if isinstance(mt, str):
-                    text_candidates.append(mt)
-
-        # Join all available text
-        joined = "\n\n".join(
-            s.strip() for s in text_candidates if isinstance(s, str) and s.strip()
-        )
-
         if not joined:
             logger.warning("No text to embed for id=%s; skipping vector.", vid)
             return None
@@ -134,11 +136,18 @@ def _normalize_vector(vec: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     if not has_values:
         return None
 
-    # Build a clean dict with only the keys Pinecone accepts
+    # Ensure metadata exists and *store content* in it
+    meta_out: Dict[str, Any] = meta if isinstance(meta, dict) else {}
+
+    # If there isn't already a strong content field, write the joined text
+    if joined:
+        if not any(k in meta_out for k in ("content", "full_text", "page_text")):
+            meta_out["content"] = joined
+
     cleaned: Dict[str, Any] = {
         "id": vid,
         "values": values,
-        "metadata": vec.get("metadata") or {},
+        "metadata": meta_out,
     }
 
     if "sparse_values" in vec:
@@ -158,7 +167,8 @@ def upsert(doc_id: str, vectors: Iterable[Dict[str, Any]], batch_size: int = 100
 
     Accepts both:
     - fully-formed Pinecone vectors (id, values, metadata), or
-    - IR-style dicts with 'id' and 'text'/metadata only; we will embed.
+    - IR-style dicts with 'id' and 'text'/metadata only; we will embed and
+      copy the text into metadata["content"].
     """
     if INDEX is None:
         logger.error("Pinecone index handle is not initialized; cannot upsert.")
@@ -187,7 +197,7 @@ def upsert(doc_id: str, vectors: Iterable[Dict[str, Any]], batch_size: int = 100
 
 
 # ---------------------------------------------------------------------
-# Simple search wrapper (used by retrieval)
+# Simple search wrapper
 # ---------------------------------------------------------------------
 
 

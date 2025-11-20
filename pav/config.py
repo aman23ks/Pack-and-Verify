@@ -35,7 +35,9 @@ class Settings:
     token_budget: int = int(os.getenv("TOKEN_BUDGET", "3000"))
 
     # --- CCU (Context-Complete Units) ---
-    CCU_STRUCT_NEIGHBORS: tuple = (3, 3)  # text blocks above/below each table/image
+    # Number of neighboring text blocks above/below each table/image.
+    # Set to 10/10 so Gemini sees a wider local context around each figure/table.
+    CCU_STRUCT_NEIGHBORS: tuple = (10, 10)
     CCU_MAX_TOKENS:       int   = int(os.getenv("CCU_MAX_TOKENS", "3000"))
     CCU_OVERLAP_TOKENS:   int   = int(os.getenv("CCU_OVERLAP_TOKENS", "200"))
     CCU_ENABLE:           bool  = os.getenv("CCU_ENABLE", "true").lower() in ("1","true","yes","on")

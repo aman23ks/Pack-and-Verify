@@ -7,6 +7,7 @@ from pav.clients.pinecone_index import upsert as pine_upsert
 from pav.clients.retrieval.search import search
 from pav.clients.retrieval.packer import pack, render_pack
 from pav.qa.answer import answer
+import json
 
 def ingest(folder: str):
     src = pathlib.Path(folder)
@@ -16,14 +17,22 @@ def ingest(folder: str):
         print(f"→ Ingest {pdf.name}")
         elems = partition_pdf(str(pdf))
         bundles = build_bundles(elems, doc_id)
+
         vecs = []
         for b in bundles:
-            text = "\n".join([*b["context_pre"], b["text_main"], b["context_post"]]).strip()
-            vecs.append({"id": b["id"], "text": text, "metadata": {
-                "doc_id": doc_id, "page": b["page"], "kind": b["kind"],
-                "text_main": b["text_main"], "context_pre": b["context_pre"],
-                "context_post": b["context_post"], "tokens_estimate": b["cost"]
-            }})
+            # All content is in text_main (section text + [Figures/Tables] block)
+            text = b["text_main"].strip()
+
+            vecs.append({
+                "id": b["id"],
+                "text": text,
+                "metadata": {
+                    "doc_id": doc_id,
+                    "tokens_estimate": b["cost"],
+                    "children": b.get("children", []),
+                },
+            })
+
         pine_upsert(doc_id, vecs)
         print(f"   Bundles: {len(bundles)}")
 

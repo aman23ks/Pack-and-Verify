@@ -1,474 +1,428 @@
 # pav/clients/gemini.py
 import base64
-import json
-from typing import List, Dict, Any, Optional
+import logging
+import os
+from typing import Optional, Dict, List, Any
 
-import backoff
 import google.generativeai as genai
+from google.generativeai.types import GenerationConfig
 
-from ..config import CONF
-from ..cache import CACHE
+logger = logging.getLogger(__name__)
 
-# ----------------------------
-# Model setup
-# ----------------------------
-genai.configure(api_key=CONF.google_key)
+# -------------------------------------------------------------------
+# Gemini setup
+# -------------------------------------------------------------------
 
-def _prefs(primary: str, fallbacks: tuple) -> List[str]:
-    return [primary] + [m for m in fallbacks if m != primary]
+GEMINI_API_KEY = "AIzaSyDw0UjO1kZVQ5j1oplJhusJ8IbisPkRfD8"
+if not GEMINI_API_KEY:
+    logger.warning("GEMINI_API_KEY is not set – Gemini calls will fail.")
+else:
+    genai.configure(api_key=GEMINI_API_KEY)
 
-# Common generation configs
-_GENCFG_TEXT = {
-    "temperature": 0.0,
-    "top_p": 1.0,
-    "top_k": 40,
-    "max_output_tokens": 2048,
-}
+# Models to try, in order
+VISION_MODELS = [
+    os.getenv("GEMINI_VISION_MODEL", "gemini-2.5-flash"),
+]
 
-_GENCFG_JSON = {
-    "temperature": 0.0,
-    "top_p": 1.0,
-    "top_k": 40,
-    "max_output_tokens": 4096,
-    "response_mime_type": "application/json",
-}
+TEXT_MODELS = [
+    os.getenv("GEMINI_TEXT_MODEL_PRIMARY", "gemini-2.5-pro"),
+    os.getenv("GEMINI_TEXT_MODEL_FALLBACK", "gemini-2.5-flash"),
+]
 
-_SAFETY = {
-    "HARASSMENT": "block_none",
-    "HATE_SPEECH": "block_none",
-    "SEXUAL": "block_none",
-    "DANGEROUS": "block_none",
-}
+# Embedding model
+EMBED_MODEL = os.getenv("GEMINI_EMBED_MODEL", "models/text-embedding-004")
 
-# ----------------------------
-# Helper to build Gemini contents correctly
-# ----------------------------
-def _content_from_texts(*texts: str) -> list:
-    """Return a single-user Content with provided text parts."""
-    parts = [{"text": t} for t in texts if t]
-    return [{"role": "user", "parts": parts}]
+# -------------------------------------------------------------------
+# Helpers
+# -------------------------------------------------------------------
 
-def _content_with_image(text: str, image_bytes: bytes) -> list:
-    """Single-user Content with text + inline image Part."""
-    return [{
-        "role": "user",
-        "parts": [
-            {"text": text},
-            {"inline_data": {"mime_type": "image/png",
-                             "data": base64.b64encode(image_bytes).decode()}}
-        ]
-    }]
 
-# ----------------------------
-# Embeddings
-# ----------------------------
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
-def embed(texts: List[str]) -> List[List[float]]:
-    out: List[List[float]] = []
-    for t in texts:
-        c = CACHE.get("embed", t)
-        if c:
-            out.append(c)
-            continue
-        emb = genai.embed_content(model=CONF.embed_model, content=t)["embedding"]
-        CACHE.set("embed", t, emb)
-        out.append(emb)
-    return out
-
-# ----------------------------
-# Vision: prompts (structured + summary)
-# ----------------------------
-def _vision_structured_prompt(context: str, doc_meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    meta_str = ""
-    if doc_meta:
-        try:
-            meta_str = json.dumps(doc_meta, ensure_ascii=False)
-        except Exception:
-            meta_str = str(doc_meta)
-
-    system = (
-        "You are an expert scientific data extractor. Convert the figure into a faithful, compact JSON record. "
-        "Do not guess. If a value is not visible or is ambiguous, set it to null and explain in `notes`."
-    )
-
-    user = f"""
-PRINCIPLES
-- Faithfulness over completeness. No invented values, labels, or units.
-- Keep numeric strings as printed (e.g., "3.2 ± 0.5") and optionally normalize in parallel fields.
-- Respect units exactly; never silently convert.
-- Capture uncertainty (CI/SD/SE), sample sizes (n), significance tests.
-- Capture legend/group mappings and panel labels (A/B/C…).
-- If axes are unlabeled or cropped, say so in notes.
-- If nearby text contradicts the image, favor the image and record the conflict.
-
-INPUTS
-- context (nearest paragraphs/captions): <<CONTEXT>>
-{context[:2000]}
-
-- doc_meta (optional JSON): <<DOC_META>>
-{meta_str}
-
-OUTPUT
-Return ONE JSON object exactly matching this schema:
-
-{{
-  "doc_id": string | null,
-  "page": number | null,
-  "figure_id": string | null,
-  "title_or_caption": string | null,
-  "panels": [{{ "panel_label": string | null, "description": string | null }}],
-  "plot_type": string | null,
-  "axes": {{
-    "x": {{"label": string | null, "unit": string | null, "scale": "linear"|"log"|"symlog"|null}},
-    "y": {{"label": string | null, "unit": string | null, "scale": "linear"|"log"|"symlog"|null}},
-    "secondary_y": {{"label": string | null, "unit": string | null}} | null
-  }},
-  "legend": [{{"key": string, "label": string}}],
-  "groups": [{{"name": string, "n": number | null}}],
-  "measures": [
-    {{
-      "what": string,
-      "group": string | null,
-      "value": number | null,
-      "unit": string | null,
-      "ci_or_sd": {{"type": "CI"|"SD"|"SE"|null, "lower": number|null, "upper": number|null, "value": string|null}},
-      "p_value": string | null
-    }}
-  ],
-  "text_verbatim": string | null,
-  "notes": {{
-    "unlabeled_axes": boolean | null,
-    "cropped_or_unclear": boolean | null,
-    "occlusions": string | null,
-    "conflicts_with_context": string | null,
-    "other": string | null
-  }}
-}}
-"""
-    return {"system": system, "user": user}
-
-def _vision_summary_from_json(rec: Dict[str, Any]) -> str:
-    parts = []
-    cap = rec.get("title_or_caption") or rec.get("figure_id")
-    if cap:
-        parts.append(f"{cap}:")
-    plot = rec.get("plot_type")
-    if plot:
-        parts.append(f"Plot type: {plot}.")
-    axes = rec.get("axes") or {}
-    axbits = []
-    x = axes.get("x") or {}
-    y = axes.get("y") or {}
-    if x.get("label"):
-        axbits.append(f'X={x.get("label")} ({x.get("unit") or "-"})')
-    if y.get("label"):
-        axbits.append(f'Y={y.get("label")} ({y.get("unit") or "-"})')
-    if axbits:
-        parts.append("Axes: " + "; ".join(axbits) + ".")
-    legend = rec.get("legend") or []
-    if legend:
-        parts.append("Legend: " + ", ".join([f'{d.get("key")}:{d.get("label")}' for d in legend]) + ".")
-    groups = rec.get("groups") or []
-    if groups:
-        parts.append("Groups: " + ", ".join([f'{g.get("name")} (n={g.get("n")})' for g in groups]) + ".")
-    measures = rec.get("measures") or []
-    bullets = []
-    for m in measures[:20]:
-        what = m.get("what") or "measure"
-        grp  = m.get("group")
-        val  = m.get("value")
-        unit = m.get("unit")
-        ci   = m.get("ci_or_sd") or {}
-        pval = m.get("p_value")
-        b = f"{what}"
-        if grp: b += f" [{grp}]"
-        if val is not None: b += f": {val}"
-        if unit: b += f" {unit}"
-        if ci.get("type"):
-            bounds = []
-            if ci.get("lower") is not None and ci.get("upper") is not None:
-                bounds.append(f'[{ci["lower"]}, {ci["upper"]}]')
-            elif ci.get("value"):
-                bounds.append(ci["value"])
-            if bounds:
-                b += f" ({ci['type']} {', '.join(bounds)})"
-        if pval:
-            b += f", {pval}"
-        bullets.append(b)
-    text = " ".join(parts).strip()
-    if bullets:
-        text += ("\n- " + "\n- ".join(bullets))
-    if not text:
-        text = "[No readable figure content.]"
-    return text
-
-# ----------------------------
-# Vision: structured extractor + legacy summary
-# ----------------------------
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
-def vision_structured(image_bytes: bytes, context: str, doc_meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    cache_key = f"vision_json:{CONF.vision_prefs[0]}:{hash(image_bytes)}:{hash(context[:1024])}"
-    cached = CACHE.get("vision_json", cache_key)
-    if cached:
-        return cached
-
-    prompt = _vision_structured_prompt(context, doc_meta)
-    combined = f"{prompt['system']}\n\n{prompt['user']}"
-    contents = _content_with_image(combined, image_bytes)
-
-    last_err = None
-    for m in _prefs(CONF.vision_prefs[0], CONF.vision_prefs):
-        try:
-            resp = genai.GenerativeModel(m).generate_content(
-                contents, generation_config=_GENCFG_JSON, safety_settings=_SAFETY
-            )
-            raw = (resp.text or "").strip()
-            data = json.loads(raw) if raw else {}
-            if isinstance(data, dict):
-                CACHE.set("vision_json", cache_key, data)
-                return data
-        except Exception as e:
-            last_err = e
-            continue
-    raise last_err or RuntimeError("Gemini vision_structured failed")
-
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
-def vision(image_bytes: bytes, context: str) -> str:
+def _safe_text(resp) -> str:
+    """
+    Convert a Gemini response to plain text safely.
+    """
+    # Newer SDK: resp.text exists
     try:
-        rec = vision_structured(image_bytes, context, doc_meta=None)
-        return _vision_summary_from_json(rec)
+        if hasattr(resp, "text") and isinstance(resp.text, str):
+            return resp.text
     except Exception:
-        prompt = (
-            "Extract faithful text/labels/numbers/units from the image. "
-            "Use nearby context ONLY to disambiguate; do not invent.\n\n"
-            f"Nearby context:\n{context[:2000]}"
-        )
-        contents = _content_with_image(prompt, image_bytes)
-        last = None
-        for m in _prefs(CONF.vision_prefs[0], CONF.vision_prefs):
-            try:
-                key = f"vision:{m}:{hash(image_bytes)}:{hash(context[:512])}"
-                c = CACHE.get("vision", key)
-                if c:
-                    return c
-                resp = genai.GenerativeModel(m).generate_content(
-                    contents, generation_config=_GENCFG_TEXT, safety_settings=_SAFETY
-                )
-                text = (resp.text or "").strip()
-                if text:
-                    CACHE.set("vision", key, text)
-                    return text
-            except Exception as e:
-                last = e
+        pass
+
+    # Fallback: walk candidates / parts
+    try:
+        parts: List[str] = []
+        for cand in getattr(resp, "candidates", []) or []:
+            content = getattr(cand, "content", None)
+            if not content:
                 continue
-        raise last or RuntimeError("Gemini vision failed")
+            for part in getattr(content, "parts", []) or []:
+                txt = getattr(part, "text", None)
+                if isinstance(txt, str):
+                    parts.append(txt)
+        return "\n".join(parts).strip()
+    except Exception:
+        return ""
 
-# ----------------------------
-# Tabular extraction → tidy JSON
-# ----------------------------
-def _table_prompt(table_text: str, context: str, doc_meta: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
-    meta_str = ""
-    if doc_meta:
+
+# -------------------------------------------------------------------
+# Vision: parse image into structured text
+# -------------------------------------------------------------------
+
+
+def vision(image_base64: str, image_mime_type: str, prompt: Optional[str] = None) -> str:
+    """
+    Call a vision-capable Gemini model with an image and an optional text prompt.
+
+    Returns a *text* description (can be JSON or free-form) that we then feed into
+    contextualize().
+    """
+    if not GEMINI_API_KEY:
+        logger.error("Gemini vision() called without GEMINI_API_KEY.")
+        return ""
+
+    if prompt is None:
+        prompt = (
+            "You are a vision parser for scientific PDFs.\n\n"
+            "TASK:\n"
+            "- Look at the image and describe its *structure* in detail.\n"
+            "- If it is a chart or table-like figure, extract:\n"
+            "  * chart_type (e.g., line_plot, bar_chart, scatter_plot, illustration, etc.)\n"
+            "  * axis labels, units, tick labels\n"
+            "  * legend entries and what they represent\n"
+            "  * for each series, the data points (with axis values)\n"
+            "- If the image is not a chart (e.g., an architecture diagram, qualitative example),\n"
+            "  describe the key components and their relationships.\n\n"
+            "Format:\n"
+            "- Prefer machine-readable JSON when you can.\n"
+            "- If JSON is not natural, provide a very detailed plain-text description.\n"
+        )
+
+    try:
+        image_bytes = base64.b64decode(image_base64)
+    except Exception as e:
+        logger.error("vision(): failed to decode base64 image: %s", e)
+        return ""
+
+    contents = [
+        {
+            "role": "user",
+            "parts": [
+                {"text": prompt},
+                {
+                    "inline_data": {
+                        "mime_type": image_mime_type or "image/png",
+                        "data": image_bytes,
+                    }
+                },
+            ],
+        }
+    ]
+
+    for model_name in VISION_MODELS:
         try:
-            meta_str = json.dumps(doc_meta, ensure_ascii=False)
-        except Exception:
-            meta_str = str(doc_meta)
-
-    system = (
-        "You are an expert table normalizer. Convert scientific tables into tidy JSON. "
-        "Do not infer values or units not shown. Preserve footnotes and missing values."
-    )
-    user = f"""
-INPUTS
-- table_text (as parsed by a PDF parser): <<TABLE>>
-{table_text[:8000]}
-
-- nearby context (caption/paragraphs): <<CONTEXT>>
-{context[:2000]}
-
-- doc_meta (optional JSON): <<DOC_META>>
-{meta_str}
-
-OUTPUT
-Return ONE JSON object:
-
-{{
-  "doc_id": string | null,
-  "page": number | null,
-  "table_id": string | null,
-  "title_or_caption": string | null,
-  "columns": [{{"name": string, "unit": string | null, "original_header": string}}],
-  "types": {{"col_name": "number"|"integer"|"string"|"percent"|"date"|"categorical"}},
-  "footnotes": [string],
-  "rows": [
-    {{
-      "_row_index": number,
-      "cells": {{"col_name": {{
-         "raw": string,
-         "parsed": number|string|null,
-         "unit": string|null,
-         "flags": ["missing"|"approx"|"lt"|"gt"|"range"|"note"],
-         "note": string|null
-      }}}}
-    }}
-  ],
-  "notes": {{
-    "header_structure": "flat"|"multirow"|"unknown",
-    "merged_cells_strategy": "forward_fill"|"as_is",
-    "missing_token_set": [string],
-    "unit_inference_source": "header"|"context"|"none",
-    "other": string|null
-  }}
-}}
-RULES
-- Extract column units from headers when present; else from context only if explicit.
-- Keep original cell strings in `raw`. If parsing fails, set `parsed`=null and explain via flags/note.
-- Temperature 0. Output ONLY the JSON.
-"""
-    return {"system": system, "user": user}
-
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
-def table_structured(table_text: str, context: str, doc_meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    key = f"table_json:{hash(table_text)}:{hash(context[:1024])}"
-    cached = CACHE.get("table_json", key)
-    if cached:
-        return cached
-
-    p = _table_prompt(table_text, context, doc_meta)
-    combined = f"{p['system']}\n\n{p['user']}"
-    contents = _content_from_texts(combined)
-
-    last_err = None
-    for m in _prefs(CONF.text_prefs[0], CONF.text_prefs):
-        try:
-            resp = genai.GenerativeModel(m).generate_content(
-                contents, generation_config=_GENCFG_JSON, safety_settings=_SAFETY
+            model = genai.GenerativeModel(model_name)
+            resp = model.generate_content(
+                contents,
+                generation_config=GenerationConfig(
+                    temperature=0.0,
+                    top_p=0.9,
+                    max_output_tokens=2048,
+                ),
             )
-            raw = (resp.text or "").strip()
-            data = json.loads(raw) if raw else {}
-            if isinstance(data, dict):
-                CACHE.set("table_json", key, data)
-                return data
+            text = _safe_text(resp)
+            if text:
+                return text.strip()
         except Exception as e:
-            last_err = e
-            continue
-    raise last_err or RuntimeError("Gemini table_structured failed")
+            logger.warning("Gemini vision error for model %s: %s", model_name, e)
 
-# ----------------------------
-# Contextualizer (tables/images → narrative)
-# ----------------------------
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
+    logger.error("Gemini vision() failed for all models.")
+    return ""
+
+
+# -------------------------------------------------------------------
+# Contextualize: turn HTML + context (and optional vision summary)
+# into a long, detailed narrative for retrieval
+# -------------------------------------------------------------------
+
+
 def contextualize(
+    *,
     kind: str,
-    primary_payload: str,
-    neighbors_text: str,
-    caption: str = "",
+    text_html: str,
+    text_above: str,
+    text_below: str,
+    vision_summary: Optional[str] = None,
     doc_meta: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
-    Create a faithful narrative (<= 180 words) that explains a TABLE or FIGURE
-    using its immediate 3-above/3-below neighbors.
-    Returns 'Insufficient context' if inputs are too thin.
+    Build a very detailed narrative in-context for an image or table.
+
+    kind: "image" | "table"
+    text_html: HTML for the image or table (e.g., <img ...> or <table>...</table>)
+    text_above: surrounding text *before* the element (already concatenated)
+    text_below: surrounding text *after* the element (already concatenated)
+    vision_summary: optional structured description from vision()
+    doc_meta: {"page": int, "element_id": str} or similar – only used in prompt text.
     """
-    meta_str = ""
-    if doc_meta:
+    if not GEMINI_API_KEY:
+        logger.error("Gemini contextualize() called without GEMINI_API_KEY.")
+        return ""
+
+    kind = kind.lower()
+    if kind not in {"image", "table"}:
+        raise ValueError(f"Unsupported kind for contextualize(): {kind}")
+
+    page_str = ""
+    if doc_meta and "page" in doc_meta:
+        page_str = f"Page: {doc_meta['page']}"
+    elem_str = ""
+    if doc_meta and "element_id" in doc_meta:
+        elem_str = f"element_id: {doc_meta['element_id']}"
+
+    header_line = f"Document context ({page_str} {elem_str})".strip()
+
+    role_line = (
+        "You are helping build a high-quality retrieval index over scientific PDFs.\n"
+        "Your job is to transform each figure or table, together with its local context,\n"
+        "into a *self-contained, very detailed narrative* that explains exactly what it shows\n"
+        "and how it relates to the surrounding text."
+    )
+
+    if kind == "image":
+        item_label = "FIGURE"
+        extra_instruction = (
+            "- Treat this as an IMAGE (figure). It may be a chart, plot, qualitative examples,\n"
+            "  architecture diagram, or other visual.\n"
+        )
+    else:
+        item_label = "TABLE"
+        extra_instruction = (
+            "- Treat this as a TABLE. Assume the HTML and context are authoritative for column\n"
+            "  names, row labels, and values, even if some formatting is imperfect.\n"
+        )
+
+    detailed_instructions = f"""
+{role_line}
+
+{extra_instruction}
+
+You are given the following pieces of information in this exact order:
+
+1. TEXT_ABOVE:
+   This is the text immediately before the {item_label} in the PDF. It provides local narrative
+   context, definitions, and explanations leading into the {item_label}.
+
+2. ITEM_CONTENT_HTML:
+   This is the HTML representation of the {item_label}. It may contain:
+   - The rendered HTML (<img> tag or <table> markup)
+   - Any caption or inline description that the parser associated with it.
+
+3. VISION_SUMMARY:
+   A machine-generated description of the figure/table structure (axes, series, numeric values,
+   legend entries, etc.). Use this to recover quantitative details that may be hard to read from
+   the HTML alone. If it seems inconsistent with the TEXT_ABOVE/TEXT_BELOW, prioritize the
+   human-written text and clearly mention the inconsistency.
+
+4. TEXT_BELOW:
+   This is the text immediately after the {item_label} in the PDF. It often contains follow-up
+   explanation, discussion of trends, or references to specific rows/columns/curves.
+
+TASK:
+
+- Using ALL of the above, write a *single, long, self-contained narrative* that:
+  1) Explicitly describes what the {item_label} shows in as much detail as possible.
+  2) Explains how it fits into the surrounding discussion (TEXT_ABOVE/TEXT_BELOW).
+  3) For charts:
+     - Name the axes and units.
+     - List the legend entries and what each series represents.
+     - Describe how the curves/bars differ numerically (e.g., “Ferret-v2 achieves 81.0 vs 76.7 on VQAv2”).
+     - Summarize the main trends and conclusions.
+  4) For tables:
+     - List all columns, row groups, and key cells.
+     - Explain what each numeric value represents conceptually (e.g., “Recall@1 on RefCOCOg”).
+     - Highlight any important comparisons (best rows, deltas, ablations, etc.).
+  5) Explicitly tie each important conclusion to evidence from the table/figure.
+
+- The output should be detailed enough that a retrieval model could answer questions about this
+  figure/table *without* needing to see the original PDF again.
+
+CONSTRAINTS:
+
+- Do NOT invent numbers or tasks that are not clearly supported.
+- If something is ambiguous, say so and explain what is and is not clear.
+- Do NOT respond in JSON. Return a single, human-readable narrative paragraph (or a few
+  paragraphs) in plain text.
+
+-----
+
+{header_line}
+
+TEXT_ABOVE:
+{text_above or "[none]"}
+
+ITEM_CONTENT_HTML:
+{text_html or "[none]"}
+
+VISION_SUMMARY:
+{vision_summary or "[none]"}
+
+TEXT_BELOW:
+{text_below or "[none]"}
+""".strip()
+
+    for model_name in TEXT_MODELS:
         try:
-            meta_str = json.dumps(doc_meta, ensure_ascii=False)
+            model = genai.GenerativeModel(model_name)
+            resp = model.generate_content(
+                [detailed_instructions],
+                generation_config=GenerationConfig(
+                    temperature=0.2,
+                    top_p=0.9,
+                    max_output_tokens=4096,
+                ),
+            )
+            text = _safe_text(resp)
+            if text:
+                return text.strip()
+        except Exception as e:
+            logger.warning("Gemini contextualize error for model %s: %s", model_name, e)
+
+    logger.error("Gemini contextualize() failed for all models; returning raw context.")
+    # As last resort, just concatenate everything so something goes in the DB
+    return detailed_instructions
+
+
+# -------------------------------------------------------------------
+# Embeddings for Pinecone
+# -------------------------------------------------------------------
+
+
+def embed(texts: List[str]) -> List[List[float]]:
+    """
+    Return embeddings for a list of texts using Gemini.
+
+    This is what Pinecone expects:
+      - `texts` is a list of strings
+      - return value is a list of float vectors (one per text)
+    """
+    if isinstance(texts, str):
+        texts = [texts]
+
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY is not set; cannot call Gemini embed().")
+
+    if not texts:
+        return []
+
+    out: List[List[float]] = []
+
+    for t in texts:
+        if not t:
+            out.append([])
+            continue
+
+        try:
+            resp = genai.embed_content(
+                model=EMBED_MODEL,
+                content=t,
+                task_type="RETRIEVAL_DOCUMENT",
+            )
+        except Exception as e:
+            logger.error("Gemini embed_content() error: %s", e)
+            out.append([])
+            continue
+
+        # Handle various possible response shapes
+        emb = None
+        try:
+            # dict-like
+            emb = resp["embedding"]["values"]
         except Exception:
-            meta_str = str(doc_meta)
+            try:
+                emb_obj = getattr(resp, "embedding", None)
+                if emb_obj is not None and hasattr(emb_obj, "values"):
+                    emb = emb_obj.values
+                else:
+                    emb_list = getattr(resp, "embeddings", None)
+                    if emb_list and hasattr(emb_list[0], "values"):
+                        emb = emb_list[0].values
+            except Exception as e2:
+                logger.error("Unexpected embed_content() response shape: %r", e2)
+                emb = None
 
-    cache_key = f"ctx_narr:{kind}:{hash(primary_payload)}:{hash(neighbors_text)}:{hash(caption)}"
-    c = CACHE.get("ctx_narr", cache_key)
-    if c:
-        return c
+        if emb is None:
+            out.append([])
+        else:
+            out.append(list(emb))
 
-    system = (
-        "You are a precise scientific writer. Write one short paragraph (<= 180 words) that faithfully explains the item "
-        "using ONLY the provided content. Do not guess or generalize beyond the inputs. Prefer exact numbers/units that appear. "
-        "If the content is insufficient to explain the item, respond exactly with 'Insufficient context'."
-    )
-    user = f"""
-ITEM_KIND: {kind.upper()}
+    return out
 
-CAPTION (optional):
-{caption or '[none]'}
 
-PRIMARY_PAYLOAD (verbatim; table HTML/text or figure JSON/text):
-<<<PRIMARY>>>
-{primary_payload[:12000]}
-<<<END PRIMARY>>>
+# -------------------------------------------------------------------
+# Generic QA answer() used by pav/qa/answer.py
+# -------------------------------------------------------------------
 
-NEIGHBORS (3 blocks above + 3 below as plain text):
-<<<NEIGHBORS>>>
-{neighbors_text[:4000]}
-<<<END NEIGHBORS>>>
 
-DOC_META (optional JSON): {meta_str}
+def answer(*args, **kwargs) -> str:
+    """
+    Very defensive wrapper so pav.qa.answer can call this in multiple ways.
 
-REWRITE REQUIREMENTS
-- Explain what the {kind} shows and how to read it.
-- Tie specific values/labels in the primary payload to statements.
-- Keep units as printed (no conversion).
-- Mention uncertainty/significance if present.
-- If inputs conflict, state the conflict.
-- No headings, no bullets—just one paragraph.
-- If not enough information: output exactly 'Insufficient context'.
-"""
-    combined = f"{system}\n\n{user}"
-    contents = _content_from_texts(combined)
+    Supported patterns:
+      - answer(prompt: str)
+      - answer(question: str, context: str)
+      - answer(question=..., context=...)
+    """
+    if not GEMINI_API_KEY:
+        logger.error("Gemini answer() called without GEMINI_API_KEY.")
+        return ""
 
-    last = None
-    for m in _prefs(CONF.text_prefs[0], CONF.text_prefs):
+    # Extract question / context from positional or keyword args
+    question = kwargs.pop("question", None)
+    context = kwargs.pop("context", None)
+
+    # Positional fallback
+    if question is None and len(args) >= 1:
+        question = args[0]
+    if context is None and len(args) >= 2:
+        context = args[1]
+
+    # Simple “just a prompt” mode
+    if context is None and len(args) == 1 and not kwargs:
+        prompt = str(question) if question is not None else ""
+    else:
+        # QA-over-context mode
+        q_text = str(question) if question is not None else ""
+        c_text = str(context) if context is not None else ""
+        prompt = (
+            "You are a QA assistant answering questions over retrieved chunks from a document.\n\n"
+            "CONTEXT:\n"
+            f"{c_text}\n\n"
+            "QUESTION:\n"
+            f"{q_text}\n\n"
+            "TASK:\n"
+            "- Answer the question using only the information in CONTEXT.\n"
+            "- Be concise but clear.\n"
+            "- If the context is insufficient or the answer is not supported, say that explicitly.\n"
+        )
+
+    last_error = None
+    for model_name in TEXT_MODELS:
         try:
-            resp = genai.GenerativeModel(m).generate_content(
-                contents, generation_config=_GENCFG_TEXT, safety_settings=_SAFETY
+            model = genai.GenerativeModel(model_name)
+            resp = model.generate_content(
+                [prompt],
+                generation_config=GenerationConfig(
+                    temperature=0.2,
+                    top_p=0.9,
+                    max_output_tokens=1024,
+                ),
             )
-            text = (resp.text or "").strip()
+            text = _safe_text(resp)
             if text:
-                CACHE.set("ctx_narr", cache_key, text)
-                return text
+                return text.strip()
         except Exception as e:
-            last = e
-            continue
-    raise last or RuntimeError("Gemini contextualize failed")
+            last_error = e
+            logger.warning("Gemini answer() error for model %s: %s", model_name, e)
 
-# ----------------------------
-# Evidence-bound Answering
-# ----------------------------
-@backoff.on_exception(backoff.expo, Exception, max_tries=5)
-def answer(pack_text: str, q: str) -> str:
-    sys = (
-        "You are a careful scientific assistant. Answer ONLY using the provided PACK. "
-        "If the PACK lacks sufficient information, respond exactly with 'Insufficient evidence'. "
-        "When you cite, quote short supporting spans in double quotes. "
-        "For numeric results, show a brief calculation if applicable."
-    )
-
-    user = f"""PACK:
-<<<
-{pack_text}
->>>
-
-QUESTION:
-{q}
-
-FORMAT:
-- If answerable: one short paragraph (<= 6 sentences) + 1-3 bullet quotes with minimal spans.
-- If not answerable from PACK: output exactly 'Insufficient evidence'.
-"""
-    combined = f"{sys}\n\n{user}"
-    contents = _content_from_texts(combined)
-
-    last = None
-    for m in _prefs(CONF.text_prefs[0], CONF.text_prefs):
-        try:
-            resp = genai.GenerativeModel(m).generate_content(
-                contents, generation_config=_GENCFG_TEXT
-            )
-            text = (resp.text or "").strip()
-            if text:
-                return text
-        except Exception as e:
-            last = e
-            continue
-    raise last or RuntimeError("Gemini answer failed")
+    logger.error("Gemini answer() failed for all models. Last error: %s", last_error)
+    return ""

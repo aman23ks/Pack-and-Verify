@@ -1,5 +1,3 @@
-# pav/clients/retrieval/search.py
-
 from typing import Optional, Dict, List
 
 from pav.clients.pinecone_index import search as pine_search

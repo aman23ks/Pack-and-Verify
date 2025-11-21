@@ -32,15 +32,14 @@ def ingest(folder: str):
 
             # Prefer top-level kind if present, else metadata.kind, else "text"
             kind = (b.get("kind") or src_meta.get("kind") or "text")
+            kind_lower = (kind or "").lower()
 
             # Text fields: prefer top-level; fall back to metadata if needed
             text_main = (b.get("text_main") or src_meta.get("text_main") or "").strip()
             narrative = (b.get("narrative") or src_meta.get("narrative") or "").strip()
 
             # ---- What we actually embed ----
-            # For figures/tables, prefer the Gemini narrative if present.
-            # For normal text, fall back to text_main.
-            kind_lower = (kind or "").lower()
+            # For figures/tables, prefer the narrative if present.
             if kind_lower in ("image", "figure", "table") and narrative:
                 content_for_index = narrative
             else:
@@ -50,12 +49,12 @@ def ingest(folder: str):
                 # Nothing meaningful to index; skip this bundle
                 continue
 
-            # Build safe metadata: no None values
             # Children may live either at top-level or inside metadata
             children = b.get("children")
             if children is None:
                 children = src_meta.get("children", [])
 
+            # Base metadata (never None values)
             meta = {
                 "doc_id": doc_id,
                 "children": children,
@@ -68,7 +67,13 @@ def ingest(folder: str):
             if cost is not None:
                 meta["tokens_estimate"] = cost
 
-            if kind:
+            # Page (this is what packer needs)
+            page = src_meta.get("page")
+            if page is not None:
+                meta["page"] = page
+
+            # Kind
+            if kind_lower:
                 meta["kind"] = kind_lower
 
             # Keep raw fields only if non-empty strings
@@ -77,11 +82,16 @@ def ingest(folder: str):
             if narrative:
                 meta["narrative"] = narrative
 
+            # You can optionally pass through some extra fields if you want
+            for extra_key in ("element_id", "parent_ccu", "caption"):
+                v = src_meta.get(extra_key)
+                if v is not None:
+                    meta[extra_key] = v
+
             vecs.append(
                 {
                     "id": b["id"],
-                    # This "text" is what pinecone_index.upsert() will embed.
-                    "text": content_for_index,
+                    "text": content_for_index,  # what pinecone_index.upsert() embeds
                     "metadata": meta,
                 }
             )
@@ -94,8 +104,9 @@ def ingest(folder: str):
         print(f"   Bundles: {len(bundles)}, Indexed: {len(vecs)}")
 
 
-def ask(question: str, budget: int):
-    matches = search(question, top_k=80)
+def ask(question: str, budget: int, namespace: str | None = None):
+    # Pass namespace through to Pinecone search
+    matches = search(question, top_k=80, namespace=namespace)
     chosen, used = pack(matches, budget)
     pack_text = render_pack(chosen)
     ans = answer(pack_text, question)
@@ -107,7 +118,7 @@ def main():
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python cli.py ingest data/papers")
-        print('  python cli.py ask "your question" [--budget 3000]')
+        print('  python cli.py ask "your question" [--budget 3000] [--ns DOC_ID]')
         sys.exit(1)
 
     cmd = sys.argv[1]
@@ -118,13 +129,34 @@ def main():
 
     elif cmd == "ask":
         budget = CONF.token_budget
-        if "--budget" in sys.argv:
-            try:
-                budget = int(sys.argv[sys.argv.index("--budget") + 1])
-            except Exception:
-                pass
-        q_parts = [x for x in sys.argv[2:] if x not in ("--budget", str(budget))]
-        ask(" ".join(q_parts), budget)
+        namespace = None
+
+        # Parse flags manually so we can keep question words free-form
+        args = sys.argv[2:]
+        i = 0
+        question_parts: list[str] = []
+
+        while i < len(args):
+            arg = args[i]
+            if arg == "--budget" and i + 1 < len(args):
+                try:
+                    budget = int(args[i + 1])
+                except Exception:
+                    pass
+                i += 2
+            elif arg in ("--ns", "--namespace") and i + 1 < len(args):
+                namespace = args[i + 1]
+                i += 2
+            else:
+                question_parts.append(arg)
+                i += 1
+
+        question = " ".join(question_parts).strip()
+        if not question:
+            print("No question provided.")
+            sys.exit(1)
+
+        ask(question, budget, namespace)
 
     else:
         print("Unknown command")

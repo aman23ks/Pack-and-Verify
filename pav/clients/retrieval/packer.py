@@ -1,40 +1,71 @@
-from typing import List, Tuple
-from collections import defaultdict
+# pav/clients/retrieval/packer.py
 
-def pack(matches, budget: int, lam: float = 0.6, per_section_cap: int = 999) -> Tuple[list, int]:
+from typing import List, Tuple, Any
+
+
+def _extract_text(md: dict) -> str:
+    """
+    Decide what text to feed into the QA model from a match's metadata.
+    """
+    return (
+        md.get("content")
+        or md.get("text_main")
+        or md.get("narrative")
+        or ""
+    )
+
+
+def pack(matches: List[Any], budget: int) -> Tuple[List[Any], int]:
+    """
+    Select a subset of Pinecone matches whose total token "cost"
+    (as stored in metadata['tokens_estimate']) does not exceed `budget`.
+
+    Returns (chosen_matches, used_tokens).
+    """
+    chosen: List[Any] = []
+    used = 0
 
     for m in matches:
-        md = m.metadata
-        md["cost"] = max(1, md.get("tokens_estimate", 200))
-        md["gain"] = m.score
-        md["sect"] = f'{md.get("kind","")}-p{md.get("page",-1)}'
+        md = getattr(m, "metadata", {}) or {}
+        cost = md.get("tokens_estimate")
 
-    chosen, used, chosen_ids = [], 0, set()
-    sect_counts = defaultdict(int)
+        # Very rough fallback if no cost recorded
+        if cost is None:
+            txt = _extract_text(md)
+            cost = max(1, len(txt) // 4)  # ≈ tokens
 
-    while True:
-        best, best_score = None, -1e18
-        for m in matches:
-            if m.id in chosen_ids: continue
-            c = m.metadata["cost"]
-            if used + c > budget: continue
-            if sect_counts[m.metadata["sect"]] >= per_section_cap: continue
-            red = lam * max([abs(m.score - cm.score) for cm in chosen] or [0])
-            score = (m.metadata["gain"] - red) / c
-            if score > best_score:
-                best, best_score = m, score
-        if not best: break
-        chosen.append(best); chosen_ids.add(best.id); used += best.metadata["cost"]
-        sect_counts[best.metadata["sect"]] += 1
+        # If adding this chunk would blow the budget, skip it
+        if used + cost > budget:
+            continue
+
+        chosen.append(m)
+        used += cost
+
     return chosen, used
 
-def render_pack(chosen) -> str:
-    blocks=[]
-    for m in chosen:
-        md=m.metadata
-        block=f"[{md['kind']} p{md['page']}]\n"
-        if md["context_pre"]: block+="\n".join(md["context_pre"])+"\n"
-        block+=md["text_main"]
-        if md["context_post"]: block+="\n"+md["context_post"]
-        blocks.append(block)
-    return "\n\n---\n\n".join(blocks)
+
+def render_pack(matches: List[Any]) -> str:
+    """
+    Turn a list of packed matches into a single text block for QA.
+
+    Each chunk is preceded by a header like:
+      [ccu p9]
+    or, if page is missing:
+      [ccu]
+    """
+    blocks: List[str] = []
+
+    for m in matches:
+        md = getattr(m, "metadata", {}) or {}
+        kind = (md.get("kind") or "chunk").lower()
+        page = md.get("page")
+
+        header = f"[{kind} p{page}]" if page is not None else f"[{kind}]"
+        body = _extract_text(md)
+
+        if not body.strip():
+            continue
+
+        blocks.append(f"{header}\n{body}")
+
+    return "\n\n".join(blocks)

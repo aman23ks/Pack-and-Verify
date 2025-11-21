@@ -7,7 +7,13 @@ from pinecone import Pinecone
 from pav.clients.embeddings import embed
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX") or os.getenv("PINECONE_INDEX_NAME")
+
+# Keep index naming flexible: env first, then default
+PINECONE_INDEX_NAME = (
+    os.getenv("PINECONE_INDEX")
+    or os.getenv("PINECONE_INDEX_NAME")
+    or "pav-quick"
+)
 
 if not PINECONE_API_KEY:
     raise RuntimeError("PINECONE_API_KEY is not set")
@@ -102,7 +108,7 @@ def upsert(doc_id: str, bundles: List[Dict]) -> None:
         batch = vectors[i : i + batch_size]
         INDEX.upsert(vectors=batch, namespace=doc_id)
 
-    print(f"[PINECONE] Upserted {len(vectors)} vectors for {doc_id}")
+    print(f"[PINECONE] Upserted {len(vectors)} vectors for {doc_id} into namespace '{doc_id}'")
 
 
 def search(
@@ -115,9 +121,16 @@ def search(
     Simple wrapper so pav.clients.retrieval.search can import `search`.
 
     Returns Pinecone matches with metadata.
+
+    NOTE:
+    - `namespace` must match the doc_id you ingested with (PDF filename stem),
+      e.g. "2404.07973v1".
     """
     if INDEX is None:
         raise RuntimeError("Pinecone index handle not configured; cannot search.")
+
+    print("-----------query-----------", query)
+    print("-----------namespace-----------", namespace)
 
     vec = embed([query])[0]
     res = INDEX.query(
@@ -127,4 +140,6 @@ def search(
         filter=filter,
         include_metadata=True,
     )
+
+    print("-----------res matched-----------", res.matches)
     return res.matches

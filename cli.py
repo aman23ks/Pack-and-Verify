@@ -27,15 +27,21 @@ def ingest(folder: str):
 
         vecs = []
         for b in bundles:
-            # Be defensive about missing keys
-            kind = b.get("kind") or "text"   # default to "text" if None
-            text_main = (b.get("text_main") or "").strip()
-            narrative = (b.get("narrative") or "").strip()
+            # Original metadata from discourse_units
+            src_meta = b.get("metadata") or {}
+
+            # Prefer top-level kind if present, else metadata.kind, else "text"
+            kind = (b.get("kind") or src_meta.get("kind") or "text")
+
+            # Text fields: prefer top-level; fall back to metadata if needed
+            text_main = (b.get("text_main") or src_meta.get("text_main") or "").strip()
+            narrative = (b.get("narrative") or src_meta.get("narrative") or "").strip()
 
             # ---- What we actually embed ----
             # For figures/tables, prefer the Gemini narrative if present.
             # For normal text, fall back to text_main.
-            if kind in ("image", "figure", "table") and narrative:
+            kind_lower = (kind or "").lower()
+            if kind_lower in ("image", "figure", "table") and narrative:
                 content_for_index = narrative
             else:
                 content_for_index = text_main
@@ -45,17 +51,25 @@ def ingest(folder: str):
                 continue
 
             # Build safe metadata: no None values
+            # Children may live either at top-level or inside metadata
+            children = b.get("children")
+            if children is None:
+                children = src_meta.get("children", [])
+
             meta = {
                 "doc_id": doc_id,
-                "children": b.get("children", []),
+                "children": children,
             }
 
+            # Cost / token estimate
             cost = b.get("cost")
+            if cost is None:
+                cost = src_meta.get("tokens_estimate")
             if cost is not None:
                 meta["tokens_estimate"] = cost
 
             if kind:
-                meta["kind"] = kind
+                meta["kind"] = kind_lower
 
             # Keep raw fields only if non-empty strings
             if text_main:

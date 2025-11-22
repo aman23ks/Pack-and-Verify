@@ -10,6 +10,8 @@ from pav.clients.retrieval.search import search
 from pav.clients.retrieval.packer import pack, render_pack
 from pav.qa.answer import answer
 import json
+from pav.clients.rerank_local import local_rerank, RERANK_AVAILABLE
+
 
 def ingest(folder: str):
     src = pathlib.Path(folder)
@@ -107,12 +109,27 @@ def ingest(folder: str):
 def ask(question: str, budget: int, namespace: str | None = None):
     # Pass namespace through to Pinecone search
     matches = search(question, top_k=80, namespace=namespace)
+    # _preview("Pinecone (cosine)", matches, 5)
+    matches = local_rerank(question, matches)
+    # _preview("Local cross-encoder rerank", matches, 5, show_rerank=True)
     chosen, used = pack(matches, budget)
     pack_text = render_pack(chosen)
     ans = answer(pack_text, question)
     print(f"\n[PACK TOKENS ≈ {used}]")
     print("\n=== ANSWER ===\n" + ans)
 
+
+# def _preview(title: str, items, k=5, show_rerank=False):
+#     print(f"\n[{title}] top {k}" + ("  (model=" + ("ON" if RERANK_AVAILABLE else "FALLBACK") + ")" if show_rerank else ""))
+#     for i, m in enumerate(list(items)[:k], 1):
+#         md = getattr(m, "metadata", {}) or {}
+#         pine = getattr(m, "score", None)
+#         rrs  = md.get("_rerank_score", None)
+#         text = (md.get("text_main") or md.get("content") or md.get("narrative") or "")
+#         text = " ".join(text.split())[:90]
+#         pine_str = f"{pine:.3f}" if isinstance(pine, (int, float)) else "—"
+#         rerank_str = f"{rrs:.3f}" if isinstance(rrs, (int, float)) else "—"
+#         print(f"{i:>2}. id={getattr(m,'id','?')}  pine={pine_str}  rerank={rerank_str}  |  {text}")
 
 def main():
     if len(sys.argv) < 2:

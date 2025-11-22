@@ -1,7 +1,7 @@
 import logging
 import os
 from typing import Optional, Dict, Any, List
-
+from dotenv import load_dotenv
 from openai import OpenAI
 
 logger = logging.getLogger(__name__)
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 # OpenAI setup
 # -------------------------------------------------------------------
-
+load_dotenv()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     logger.warning("OPENAI_API_KEY is not set – OpenAI calls will fail.")
@@ -104,16 +104,15 @@ def contextualize(
 
     prompt = f"""
 You are helping build a high-quality retrieval index over scientific PDFs.
-Your job is to transform each figure or table, together with its local context,
-into a self-contained, very detailed narrative that explains exactly what it shows
-and how it relates to the surrounding text.
+Your goal is to produce a *self-contained, detailed narrative* for each figure or table
+using ONLY the information explicitly available in the provided context.
 
-Treat this as a {item_label}. You do NOT see the raw pixels; you only see:
-- HTML for the element (img tag or table markup),
-- nearby text above and below it,
-- and an optional machine summary.
+Treat this as a {item_label}. You DO NOT see the raw pixels; rely strictly on:
+- the HTML element (<img> or <table>),
+- the nearby text immediately above and below,
+- and an optional machine-generated visual summary (if available).
 
-Use ALL of the following, in order:
+Use ALL of the following, in this order:
 
 TEXT_ABOVE:
 {text_above or "[none]"}
@@ -128,16 +127,18 @@ TEXT_BELOW:
 {text_below or "[none]"}
 
 TASK:
-- Write a single, long, self-contained narrative that:
-  1) Explicitly describes what the {item_label} shows in as much detail as possible.
-  2) Explains how it fits into the surrounding discussion.
-  3) For tables, list columns/rows and explain the meaning of key values whenever
-     they are visible from the HTML or surrounding text.
-  4) For charts, describe axes, series, and trends as far as they can be inferred
-     from the HTML and surrounding text.
-- Do NOT invent numbers or tasks beyond what the context supports.
-- If something is ambiguous because we don't see the actual pixels, say so explicitly.
-- Return plain text ONLY (no JSON, no markdown tables).
+- Write a single, cohesive, and fully self-contained narrative that:
+  1) Describes what the {item_label} likely shows, based only on the above evidence.
+  2) Explains how it fits into the surrounding discussion (TEXT_ABOVE/TEXT_BELOW).
+  3) For tables: mention headers, columns, and interpret visible numeric values if available.
+  4) For figures/charts: mention axes, trends, comparisons, or relationships described in text.
+  5) If the HTML or vision summary seems incomplete, clearly note the ambiguity—do not speculate.
+
+CONSTRAINTS:
+- Base your narrative ONLY on the given context.
+- Do NOT infer information from external knowledge or the internet.
+- Do NOT invent numbers, labels, or results not supported by the evidence.
+- Return plain text ONLY (no lists, markdown, or JSON).
 
 {header_line}
 """.strip()

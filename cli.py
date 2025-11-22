@@ -9,7 +9,7 @@ from pav.clients.pinecone_index import upsert as pine_upsert
 from pav.clients.retrieval.search import search
 from pav.clients.retrieval.packer import pack, render_pack
 from pav.qa.answer import answer
-
+import json
 
 def ingest(folder: str):
     src = pathlib.Path(folder)
@@ -21,10 +21,10 @@ def ingest(folder: str):
 
         # 1) Run unstructured on the PDF
         elems = partition_pdf(str(pdf))
-
+        
         # 2) Build logical bundles (sections, figures, tables, etc.)
         bundles = build_bundles(elems, doc_id)
-
+        
         vecs = []
         for b in bundles:
             # Original metadata from discourse_units

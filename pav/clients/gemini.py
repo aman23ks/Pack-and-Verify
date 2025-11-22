@@ -1,9 +1,3 @@
-# pav/clients/gemini.py
-#
-# NOTE: This file now uses OpenAI instead of Gemini, but keeps the same
-# function names so the rest of the codebase (discourse_units, qa, etc.)
-# does not need to change.
-
 import logging
 import os
 from typing import Optional, Dict, Any, List

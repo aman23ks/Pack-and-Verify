@@ -139,6 +139,7 @@ def search(
         namespace=namespace,
         filter=filter,
         include_metadata=True,
+        include_values=True,
     )
 
     print("-----------res matched-----------", res.matches)

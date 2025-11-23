@@ -1,7 +1,7 @@
 # Pack-and-Verify (Quick POC)
 
 Free-tier POC: Unstructured (hi_res) to segment PDFs (text/tables/images),
-Gemini for vision+QA+embeddings, Pinecone for vector search, and a budgeted
+OpenAi for vision+QA+embeddings, Pinecone for vector search, and a budgeted
 packer (gain-per-token + MMR).
 
 ## Quickstart

@@ -16,13 +16,8 @@ if not OPENAI_API_KEY:
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Default text model (cheap, good enough for RAG narratives + QA)
 TEXT_MODEL = os.getenv("OPENAI_TEXT_MODEL", "gpt-4.1-mini")
 
-
-# -------------------------------------------------------------------
-# Internal helper to call chat completions
-# -------------------------------------------------------------------
 
 def _chat(prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str:
     """
@@ -45,11 +40,6 @@ def _chat(prompt: str, max_tokens: int = 2048, temperature: float = 0.2) -> str:
         logger.error("OpenAI chat completion error: %s", e)
         return ""
 
-
-# -------------------------------------------------------------------
-# Vision: currently a stub (no real image parsing)
-# -------------------------------------------------------------------
-
 def vision(image_base64: str, image_mime_type: str, prompt: Optional[str] = None) -> str:
     """
     TEMP STUB: We are not actually sending the image to OpenAI here.
@@ -62,12 +52,6 @@ def vision(image_base64: str, image_mime_type: str, prompt: Optional[str] = None
     """
     logger.info("vision() stub called – returning empty summary (no Gemini).")
     return ""
-
-
-# -------------------------------------------------------------------
-# Contextualize: turn HTML + context (+ optional vision summary)
-# into a long narrative for retrieval
-# -------------------------------------------------------------------
 
 def contextualize(
     *,

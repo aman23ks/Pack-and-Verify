@@ -1,0 +1,456 @@
+namespace,question
+2404.07973v1,What main problem are the authors trying to solve with CARA?
+2404.07973v1,Why is “insufficient context” a serious issue for vision–language models in this paper?
+2404.07973v1,How do the authors motivate the need for abstaining instead of always answering?
+2404.07973v1,What risks do the authors highlight when VLMs answer without enough information?
+2404.07973v1,In your own words what is CARA and how does it interact with a base VLM?
+2404.07973v1,How does CARA change the inference behavior of an existing vision–language model?
+2404.07973v1,Where in the overall pipeline is CARA inserted relative to the backbone VLM?
+2404.07973v1,What signals does CARA look at when deciding whether to abstain on a query?
+2404.07973v1,Does CARA modify the VLM’s internal weights or sit as a separate decision layer on top?
+2404.07973v1,What are the main inputs to CARA’s selector module for each question–image pair?
+2404.07973v1,How do the authors formally define an “ambiguous” question in their study?
+2404.07973v1,How do they define a case of “insufficient context” for a question?
+2404.07973v1,What is the difference between a hard but well-defined question and an ambiguous one in this paper?
+2404.07973v1,How do human annotators label examples as ambiguous or lacking context in the experiments?
+2404.07973v1,Which base vision–language models do the authors evaluate CARA on?
+2404.07973v1,Which main datasets are used to test CARA’s effectiveness?
+2404.07973v1,Why is VQA v2 considered a good benchmark for studying CARA?
+2404.07973v1,What properties of GQA make it relevant for evaluating CARA’s behavior?
+2404.07973v1,Why do the authors choose OKVQA and A-OKVQA as part of their evaluation suite?
+2404.07973v1,How do the authors measure accuracy when the model is allowed to abstain?
+2404.07973v1,What utility or scoring function do they use to balance wrong answers versus abstentions?
+2404.07973v1,How does CARA’s effective accuracy compare to running the base VLM with no abstention?
+2404.07973v1,On which dataset does CARA deliver the largest gain over a simple abstention baseline?
+2404.07973v1,How does CARA’s abstention rate on VQA v2 compare to the Selector-MLP baseline?
+2404.07973v1,On GQA what fraction of CARA’s abstained questions are labeled ambiguous by humans?
+2404.07973v1,On OKVQA what fraction of CARA’s abstentions are judged to have insufficient context?
+2404.07973v1,According to the analysis does CARA tend to abstain on ambiguous questions or on well-posed ones?
+2404.07973v1,How do human studies suggest that CARA is abstaining for the “right” reasons?
+2404.07973v1,How do the authors show that CARA is not simply avoiding all difficult questions?
+2404.07973v1,In what ways does CARA outperform simple confidence-threshold abstention methods?
+2404.07973v1,Why is raw confidence from the VLM not enough to detect insufficient context cases?
+2404.07973v1,What loss functions are used to train the CARA selector module?
+2404.07973v1,Do the authors fine-tune the base VLM when training CARA or keep the backbone fixed?
+2404.07973v1,How are positive and negative labels for “answer” versus “abstain” constructed in training?
+2404.07973v1,How do they handle training samples where the question is ambiguous but the VLM guess happens to be correct?
+2404.07973v1,What training pipeline do they follow to attach CARA to an existing VLM?
+2404.07973v1,What role does multimodal context play in the design of CARA’s selector?
+2404.07973v1,How do they evaluate whether CARA generalizes to datasets it was not trained on?
+2404.07973v1,When CARA is applied to new models and benchmarks, how does accuracy change?
+2404.07973v1,What evidence do the authors give that CARA can help on future unseen benchmarks?
+2404.07973v1,Is there any scenario where adding CARA makes performance worse than using the base VLM alone?
+2404.07973v1,How do the authors discuss the computational overhead added by CARA?
+2404.07973v1,What is the purpose of the context window size ablation in the paper?
+2404.07973v1,For VL-BERT on VCR and Visual SWAG what context window size is reported as optimal?
+2404.07973v1,How does performance behave when the context window is smaller than the optimal size?
+2404.07973v1,What happens to performance when the context window size becomes much larger than optimal?
+2404.07973v1,Why do very large context windows eventually hurt performance according to their results?
+2404.07973v1,When they vary how many context snippets are selected which selection count works best?
+2404.07973v1,Why does feeding all snippets in a window without selection degrade performance?
+2404.07973v1,How does the probabilistic context selection method compare to heuristic selection rules?
+2404.07973v1,What do they find when comparing context that is only text versus only image?
+2404.07973v1,How does mixing image and text context affect performance versus text-only context?
+2404.07973v1,Why do they claim that visual context can introduce noise into the reasoning process?
+2404.07973v1,How is CARA conceptually related to the context selection mechanisms studied in the paper?
+2404.07973v1,In the qualitative example where the VLM says “She is drinking,” why does CARA abstain?
+2404.07973v1,In the example with a doll at a table what answer does the base model give and what does CARA do?
+2404.07973v1,In the two-bags-on-a-bed example why do human annotators judge the question as ambiguous?
+2404.07973v1,How do the qualitative examples demonstrate that CARA avoids baseless guesses?
+2404.07973v1,What trade-off between abstention rate and accuracy do the authors highlight?
+2404.07973v1,How do they test whether CARA is abstaining for principled reasons and not randomly?
+2404.07973v1,What metrics besides plain accuracy do they use to evaluate CARA’s impact?
+2404.07973v1,What kinds of failure cases of CARA are discussed in the limitations section?
+2404.07973v1,How do they handle questions where human annotators themselves disagree on the correct answer?
+2404.07973v1,How do the authors think a responsible model should behave when genuinely uncertain?
+2404.07973v1,What future research directions do they propose around abstention in multimodal models?
+2404.07973v1,How do they argue that CARA can be useful in safety-critical or high-stakes applications?
+2404.07973v1,How does CARA handle free-form answers compared to multiple-choice formats?
+2404.07973v1,What assumptions do they make about access to ground-truth labels when training CARA?
+2404.07973v1,How do they define the cost of a wrong answer relative to the cost of abstaining?
+2404.07973v1,Do they explore different thresholds for how often CARA should abstain?
+2404.07973v1,How consistent is CARA’s behavior across different backbone models?
+2404.07973v1,What evidence do they give that CARA focuses on ambiguous or underspecified questions instead of just low-confidence ones?
+2404.07973v1,What are the main conclusions from the human annotation study on CARA’s abstentions?
+2404.07973v1,How do they argue that ambiguous questions are common even in standard VQA benchmarks?
+2404.07973v1,How do they distinguish between noisy dataset labels and truly ambiguous questions?
+2404.07973v1,What do they say about how future datasets should handle underspecified questions?
+2404.07973v1,What limitations of the current CARA implementation do the authors acknowledge?
+2404.07973v1,What alternative selector architectures do they suggest could be tested in future work?
+2404.07973v1,How is CARA related to the broader idea of selective prediction in machine learning?
+2404.07973v1,How is it related to deferred prediction or “ask a human” strategies?
+2404.07973v1,What overall message do they send about abstention as part of responsible AI?
+2404.07973v1,What is the authors’ main takeaway about how models should behave when context is missing?
+2404.07973v1,Why do they say that “insufficient context” is different from ordinary prediction uncertainty?
+2404.07973v1,What is an example from the paper where the model would give a seemingly confident but contextless answer?
+2404.07973v1,How does CARA help in avoiding answers that depend on guessing unseen parts of a scene?
+2404.07973v1,How do the authors measure how often CARA abstains on questions that humans label as underspecified?
+2404.07973v1,How well does CARA align with human judgments of when the model should say “I don’t know”?
+2404.07973v1,In the experiments how do they separate ambiguous questions from ones with insufficient visual context?
+2404.07973v1,How is the notion of “insufficient context” operationalized for each dataset?
+2404.07973v1,How does CARA behave differently on clearly answerable questions versus borderline ones?
+2404.07973v1,What behavior would be considered a failure for CARA in the authors’ framework?
+2404.07973v1,Do they analyze any cases where CARA abstains but the VLM would actually have the correct answer?
+2404.07973v1,What does this paper suggest about the value of adding an abstention layer to existing deployed VLMs?
+2404.07973v1,How do the authors justify the extra complexity of adding CARA to a system?
+2404.07973v1,What insights from this paper could be applied to text-only LLMs?
+2404.07973v1,What do the authors say about combining CARA with other safety or calibration techniques?
+2404.07973v1,How could CARA be adapted for interactive systems where a human can supply more context when needed?
+2404.07973v1,What potential extensions to video–language tasks do the authors hint at, if any?
+2404.07973v1,How might CARA’s ideas transfer to conversational agents that ask clarification questions?
+2404.07973v1,What open questions about abstention thresholds and user preferences are left unresolved?
+2404.07973v1,What is the most important conceptual contribution of the CARA paper according to the authors?
+2404.07973v1,How does CARA relate to the idea of calibration and confidence in machine learning?
+2404.07973v1,What do the authors say about using CARA as a plug-in with future stronger VLMs?
+2404.07973v1,How do they envision CARA being integrated into real-world VQA-like products?
+2404.07973v1,Overall what do the authors want readers to remember about CARA’s behavior and benefits?
+2404.07973v1,How does the paper’s notion of “baseless predictions” help frame the abstention problem?
+2404.07973v1,What kind of user-facing behavior would CARA enable in an end application?
+2404.07973v1,How could CARA’s abstain decisions be explained to users so they trust the system more?
+2404.07973v1,What are some limitations in their human evaluation setup that they mention or that you can infer?
+2404.07973v1,How might dataset design need to change if CARA-style abstention becomes standard practice?
+2404.07973v1,What might be an example of a downstream domain where CARA-style abstention is especially valuable?
+2404.07973v1,How do the authors differentiate CARA from simple heuristic rules like “abstain on low-confidence answers”?
+2404.07973v1,In what ways could CARA’s selector itself be improved, according to the discussion?
+2404.07973v1,How does CARA interact with the context windowing experiments in terms of design philosophy?
+2404.07973v1,What is one key result from the ablation studies that supports the authors’ claims about CARA?
+2404.07973v1,How does CARA’s performance compare on different types of questions such as yes/no vs open-ended?
+2404.07973v1,What insights about human labeling of ambiguity are important for designing abstention systems like CARA?
+2404.07973v1,What do the authors say about the long-term vision for models that can “know when they don’t know”?
+2404.07973v1,How do the authors describe the overall pipeline from image and question to CARA output
+2404.07973v1,What types of features from the base VLM are fed into the CARA selector
+2404.07973v1,Does CARA use only the final logits of the VLM or also intermediate representations
+2404.07973v1,How is the notion of answer utility defined for the abstention decision
+2404.07973v1,How is the tradeoff between wrong answers and abstentions controlled in their setup
+2404.07973v1,What happens to effective accuracy when the abstention penalty is made more severe
+2404.07973v1,What happens to effective accuracy when abstaining is made cheap in the utility function
+2404.07973v1,How sensitive is CARA performance to the exact cost assigned to abstention
+2404.07973v1,What training objective encourages CARA to abstain on low utility predictions
+2404.07973v1,Do the authors consider class imbalance between abstain and answer labels in training
+2404.07973v1,How is the training data for CARA split between training validation and test
+2404.07973v1,Do they train CARA separately for each dataset or share a single selector across tasks
+2404.07973v1,How is cross dataset generalization evaluated for CARA
+2404.07973v1,Do they experiment with training CARA on one dataset and evaluating on another
+2404.07973v1,How well does CARA transfer from VQA style tasks to more structured tasks if tested
+2404.07973v1,How do they measure whether abstentions concentrate on ambiguous or noisy samples
+2404.07973v1,What percentage of CARA abstentions on VQA v2 are judged truly ambiguous by humans
+2404.07973v1,What percentage of CARA abstentions on GQA are judged truly ambiguous by humans
+2404.07973v1,How often does CARA abstain on questions that annotators consider clear and answerable
+2404.07973v1,Do they analyze abstentions separately for yes no questions and open ended questions
+2404.07973v1,How does CARA behave on counting questions compared to attribute questions
+2404.07973v1,How does CARA perform on questions about object presence compared to relation questions
+2404.07973v1,What evidence is shown that CARA avoids over relying on dataset priors
+2404.07973v1,How do the authors illustrate the concept of baseless guesses with concrete examples
+2404.07973v1,Why do they say that ambiguous questions are especially common in visual question answering
+2404.07973v1,What annotation protocol is used to label questions as ambiguous or insufficient context
+2404.07973v1,How many human annotators review each abstained question in their study
+2404.07973v1,How do they measure agreement among annotators on ambiguity labels
+2404.07973v1,Do the annotators see the model predictions or only the question and image
+2404.07973v1,What instructions are given to annotators about when a question should be called ambiguous
+2404.07973v1,How do they instruct annotators to label cases where the dataset label might be wrong
+2404.07973v1,What fraction of abstentions correspond to potential labeling errors in the dataset
+2404.07973v1,How do they distinguish between genuine ambiguity and annotation noise
+2404.07973v1,What summary statistics do they report for the distribution of abstentions by category
+2404.07973v1,Do they analyze abstentions by image type such as indoor scenes versus outdoor scenes
+2404.07973v1,Do they analyze abstentions by question length or linguistic complexity
+2404.07973v1,Does CARA abstain more often on questions that require commonsense knowledge
+2404.07973v1,Does CARA abstain more often on questions that require fine grained visual details
+2404.07973v1,What role do question only features play in the selector compared to multimodal features
+2404.07973v1,Do they include any explicit uncertainty measures from the VLM such as entropy
+2404.07973v1,How does CARA compare against a baseline that abstains based on probability entropy
+2404.07973v1,How does CARA compare against a baseline that uses margin between top classes
+2404.07973v1,How does CARA compare to a small multilayer perceptron using only logits as input
+2404.07973v1,Which baseline abstention methods are strongest and how close is CARA to them
+2404.07973v1,In which regimes does CARA clearly outperform simple confidence based thresholds
+2404.07973v1,Does CARA ever underperform confidence based methods on any dataset
+2404.07973v1,How do they visualize the tradeoff curves between coverage and accuracy
+2404.07973v1,What do coverage accuracy plots show about CARA’s operating points
+2404.07973v1,What is the meaning of coverage in the context of abstaining models
+2404.07973v1,How is risk defined in their selective prediction analysis
+2404.07973v1,What region of the risk coverage curve do the authors care about most
+2404.07973v1,What do the authors say about choosing an operating point for practical systems
+2404.07973v1,How is the context window around a question defined in the context selection experiments
+2404.07973v1,What is the difference between a context window and the abstention module conceptually
+2404.07973v1,What is the optimal context window size found for VL BERT on VCR
+2404.07973v1,What is the optimal context window size found for VL BERT on Visual SWAG
+2404.07973v1,What happens when the context window size is reduced to just a few frames or sentences
+2404.07973v1,What happens when the context window is expanded far beyond the optimal size
+2404.07973v1,Why do the authors argue that too much context can harm performance
+2404.07973v1,How does the number of selected snippets within the window affect performance
+2404.07973v1,What selection count in the window gives the best performance in their experiments
+2404.07973v1,Why does including all snippets without selection hurt VL BERT performance
+2404.07973v1,How does their probabilistic selection strategy differ from heuristic top scoring selection
+2404.07973v1,What empirical advantage is shown for probabilistic selection over heuristics
+2404.07973v1,How do they test the relative importance of text context versus image context
+2404.07973v1,What is the performance when using only text context and no visual context
+2404.07973v1,What is the performance when using only visual context and minimal text
+2404.07973v1,What pattern do they observe when mixing both text and image context
+2404.07973v1,Why do they suggest that text context often carries more useful information than extra images
+2404.07973v1,How do the context selection findings relate to the design of CARA
+2404.07973v1,Do they explore any joint training of context selection and CARA in one model
+2404.07973v1,What do they conclude about the value of structured context for reducing baseless guesses
+2404.07973v1,How does CARA behave on out of distribution question types if discussed
+2404.07973v1,Do the authors run any robustness tests against image perturbations for CARA
+2404.07973v1,How might CARA behave under adversarially crafted ambiguous questions
+2404.07973v1,What safety implications do the authors mention for abstaining VLMs
+2404.07973v1,What concrete application domains do they mention as motivation such as medical or legal
+2404.07973v1,How does CARA help users calibrate their trust in model outputs
+2404.07973v1,How could a user interface expose CARA’s abstentions in a helpful way
+2404.07973v1,What is one example of a user experience that would be improved by CARA style abstention
+2404.07973v1,Do they discuss any limitations in the way ambiguity is labeled by annotators
+2404.07973v1,How might cultural or linguistic differences influence judgments of ambiguity
+2404.07973v1,What do the authors say about scaling CARA to larger and more capable backbone models
+2404.07973v1,How might improvements in the base VLM change the ideal behavior of CARA
+2404.07973v1,Could CARA be adapted to handle multi step reasoning chains rather than single predictions
+2404.07973v1,What role could CARA play in dialog style systems that ask clarifying questions
+2404.07973v1,What questions do the authors leave open about combining abstention with explanation
+2404.07973v1,How do they position CARA relative to methods that detect dataset outliers
+2404.07973v1,What is the relationship between CARA and calibration methods that adjust probability estimates
+2404.07973v1,What are the main differences between CARA and selective prediction methods in text only settings
+2404.07973v1,How does the multimodal nature of VQA change the abstention problem compared to plain text
+2404.07973v1,What open challenges remain for measuring ambiguity in multimodal benchmarks
+2404.07973v1,How could future benchmarks better annotate ambiguous and underspecified questions
+2404.07973v1,Do the authors suggest any new evaluation protocols for abstaining models
+2404.07973v1,How might CARA’s ideas carry over to video question answering
+2404.07973v1,What is a key insight from their ablation studies that influences how you would design a system
+2404.07973v1,What do the authors identify as the primary bottleneck in current VLM behavior regarding insufficient context
+2404.07973v1,How do they propose that future models should treat questions with missing information
+2404.07973v1,In what sense is CARA a step toward more cautious AI systems
+2404.07973v1,How do the authors frame the ethical importance of abstaining instead of hallucinating answers
+2404.07973v1,What is the main conceptual insight about ambiguity that you take away from this paper
+2404.07973v1,How could CARA be extended to not only abstain but also request specific missing context
+2404.07973v1,Why might it be useful for CARA to express different levels of uncertainty rather than a binary decision
+2404.07973v1,What do the authors say about the limits of their experiments in terms of dataset diversity
+2404.07973v1,What type of additional datasets would you want to test CARA on to stress it further
+2404.07973v1,How does the paper inspire changes in how we design evaluation metrics for VLMs
+2404.07973v1,Which part of the method seems most sensitive to hyperparameter choices
+2404.07973v1,Which result figure or table do you think most strongly demonstrates CARA’s value conceptually
+2404.07973v1,If you had to summarize CARA to a non expert in one sentence how would you do it based on the paper
+2404.07973v1,What new questions about abstention and multimodal reasoning does this paper make you want to explore
+2404.07973v1,What is one possible industrial use case where CARA could be particularly impactful
+2404.07973v1,How could CARA help reduce liability or risk in automated decision making systems
+2404.07973v1,How do the authors connect CARA to the broader theme of safe deployment of large models
+2404.07973v1,What aspects of CARA would you try to improve if you were to build a next generation version
+2404.07973v1,What remaining conceptual gaps do you see between CARA and truly calibrated human like abstention
+2404.07973v1,How does the paper influence your view on the importance of saying I do not know in AI systems
+2404.07973v1,What is one concrete experiment from the paper that you would like to replicate or extend
+2404.07973v1,How might CARA interact with retrieval augmented systems that can fetch external knowledge
+2404.07973v1,How would you test CARA in a real world application where missing context is frequent
+2404.07973v1,What are the most important limitations section points that you need to remember for honest reporting
+2404.07973v1,If the base VLM improves significantly would the same CARA selector still be optimal
+2404.07973v1,What would you monitor during deployment to ensure CARA continues to behave as intended
+2404.07973v1,How could feedback from users be incorporated to refine CARA over time
+2404.07973v1,In your own words what is the key difference between CARA and just lowering your confidence threshold
+2405.11145v4,What is the main goal of the Ferret model family?
+2405.11145v4,How is Ferret different from standard VLMs that only output text?
+2405.11145v4,Why do the authors focus on region-level grounding instead of just global image features?
+2405.11145v4,What tasks does Ferret target such as referring expressions or grounded captioning?
+2405.11145v4,Why is region grounding important for understanding complex scenes?
+2405.11145v4,How does Ferret-v2 extend or improve on the original Ferret?
+2405.11145v4,What new capabilities does Ferret-v2 add compared to the first version?
+2405.11145v4,What kinds of region annotations are used during Ferret-v2 training?
+2405.11145v4,How are bounding boxes represented so the language model can reason over them?
+2405.11145v4,Which vision backbone do the authors use in Ferret-v2?
+2405.11145v4,Which language model backbone is used inside Ferret-v2?
+2405.11145v4,How is region information fused with text tokens in Ferret-v2’s architecture?
+2405.11145v4,What loss functions are used to train Ferret to both answer and localize?
+2405.11145v4,How do the authors combine caption text and region annotations in the training data?
+2405.11145v4,What strategies are used to encourage compositional reasoning about objects and attributes?
+2405.11145v4,Which benchmarks are used to evaluate referring expression comprehension?
+2405.11145v4,Which datasets are used to evaluate grounded captioning performance?
+2405.11145v4,On which benchmark does Ferret-v2 achieve the largest improvement over strong baselines?
+2405.11145v4,How does Ferret-v2 perform on referring expression comprehension compared with the original Ferret?
+2405.11145v4,How does Ferret-v2’s grounded captioning performance compare to non-grounded models?
+2405.11145v4,How well does Ferret-v2 perform on general vision–language benchmarks beyond grounding tasks?
+2405.11145v4,What do the authors report about Ferret-v2’s zero-shot performance on new tasks?
+2405.11145v4,How does performance change when the amount of grounding supervision is reduced?
+2405.11145v4,In an ablation where grounding losses are removed, how does localization accuracy change?
+2405.11145v4,What happens when region-level supervision is heavily reduced or removed altogether?
+2405.11145v4,How does the parameter count of Ferret-v2 compare to its base language model?
+2405.11145v4,What evidence do they give that explicit grounding improves interpretability?
+2405.11145v4,In qualitative examples, how does Ferret highlight the correct region for a phrase like “the small dog on the left”?
+2405.11145v4,How does Ferret behave when there are several similar objects but the description refers to only one?
+2405.11145v4,What kinds of grounding mistakes does Ferret-v2 still make in cluttered scenes?
+2405.11145v4,What examples do the authors show where Ferret-v2 produces more detailed captions than baselines?
+2405.11145v4,In visualizations of attention or region selection what patterns appear for specific objects?
+2405.11145v4,How does Ferret-v2 handle rare or unseen object categories?
+2405.11145v4,How does the model capture fine-grained attributes like color or small accessories in grounding?
+2405.11145v4,What prompt format do the authors use for tasks that require both answering and grounding?
+2405.11145v4,How is the output formatted when Ferret returns a textual answer and a predicted region?
+2405.11145v4,What do the authors do to prevent the model from relying purely on shortcut cues without localization?
+2405.11145v4,What evidence do they show that grounding helps avoid spurious correlations between objects and labels?
+2405.11145v4,How does Ferret-v2 compare to older grounding models that rely on separate region-proposal modules?
+2405.11145v4,What training tricks or optimization details are mentioned as important for Ferret-v2?
+2405.11145v4,What role do large-scale instruction-tuning or conversational data play in Ferret-v2’s training?
+2405.11145v4,How do the authors evaluate whether Ferret’s explanations match its internal reasoning?
+2405.11145v4,What examples show that Ferret’s grounded outputs help humans understand why an answer was chosen?
+2405.11145v4,How does Ferret-v2 handle questions about relationships between multiple objects in a scene?
+2405.11145v4,What qualitative examples show Ferret correctly capturing complex spatial relationships?
+2405.11145v4,What failure examples do the authors show where Ferret highlights the wrong area or mis-describes a region?
+2405.11145v4,How do the authors position Ferret-v2 for future applications like robotics or interactive agents?
+2405.11145v4,What limitations of Ferret-v2 are explicitly acknowledged in the paper?
+2405.11145v4,What future research directions do they suggest for improving grounded VLMs?
+2405.11145v4,How does Ferret handle instructions that ask it to compare two different regions?
+2405.11145v4,What do they say about the inference cost of Ferret-v2 compared with similar-sized models?
+2405.11145v4,How do the authors argue that better grounding improves reliability and safety?
+2405.11145v4,Overall what are the main contributions and takeaways of the Ferret-v2 paper?
+2405.11145v4,How does Ferret-v2’s design relate to broader trends in multimodal large language models?
+2405.11145v4,What do the authors say about scaling Ferret to larger backbones or more data?
+2405.11145v4,How does Ferret-v2 perform when text prompts are long and complex?
+2405.11145v4,What do they observe about Ferret’s ability to follow multi-step grounded instructions?
+2405.11145v4,How robust is Ferret-v2 when background clutter increases?
+2405.11145v4,How does Ferret react when two regions both partially match a description?
+2405.11145v4,What happens when the textual description conflicts with the actual visual content?
+2405.11145v4,How do the authors test Ferret’s ability to reason compositionally about objects and attributes?
+2405.11145v4,What benchmarks are used to stress-test compositional grounding skills?
+2405.11145v4,How does Ferret-v2 compare to text-only LLMs on questions that clearly depend on visual detail?
+2405.11145v4,In which scenarios does Ferret-v2 still struggle even though grounding information is available?
+2405.11145v4,What remain the hardest types of grounding queries for Ferret-v2?
+2405.11145v4,How might Ferret’s grounded outputs be used inside a larger interactive system?
+2405.11145v4,What potential uses do the authors mention for image editing or region-based commands?
+2405.11145v4,How do Ferret’s region outputs compare to heatmap-style attention visualizations?
+2405.11145v4,What high-level messages do the authors want readers to remember about Ferret-v2?
+2405.11145v4,How does Ferret-v2 aim to bridge the gap between pixel-level perception and language?
+2405.11145v4,What design choices make Ferret-v2 better suited for grounding than a generic VLM?
+2405.11145v4,How does Ferret-v2 encode region coordinates relative to the image size?
+2405.11145v4,What forms of data augmentation do they use when training grounding tasks?
+2405.11145v4,How do they handle overlapping regions or nested bounding boxes during training?
+2405.11145v4,What metrics are used to evaluate localization quality for referring expressions?
+2405.11145v4,What metrics are used to evaluate the quality of grounded captions?
+2405.11145v4,How do they combine text accuracy and localization accuracy into a single picture of performance?
+2405.11145v4,What is the reported performance gap between Ferret-v2 and the strongest non-grounded baseline on grounding?
+2405.11145v4,How does Ferret-v2 perform on zero-shot grounding scenarios where objects or attributes differ from training?
+2405.11145v4,What parts of the architecture make Ferret-v2 flexible to different visual backbones?
+2405.11145v4,What considerations do the authors raise for deploying Ferret-style models in practice?
+2405.11145v4,How could Ferret’s region outputs be combined with downstream modules like planners or controllers?
+2405.11145v4,What do they say about user-facing interfaces for interacting with grounded outputs?
+2405.11145v4,How might Ferret-v2 be used as a building block for visual agents that can follow spatial instructions?
+2405.11145v4,How do the authors contrast Ferret-v2 with models that only provide textual rationales?
+2405.11145v4,What are the main architectural trade-offs they discuss when adding explicit grounding?
+2405.11145v4,What examples show Ferret-v2 correctly attending to small objects that baselines miss?
+2405.11145v4,Where does Ferret-v2 still fail on small or subtle objects according to qualitative examples?
+2405.11145v4,What do the authors say about bias or fairness issues that might arise in grounded models?
+2405.11145v4,How might grounding information help detect or reduce certain types of dataset bias?
+2405.11145v4,What open questions remain about evaluation of grounded VLMs beyond the benchmarks they use?
+2405.11145v4,What ideas do the authors suggest for future benchmarks better suited to grounding-heavy models like Ferret?
+2405.11145v4,How does the paper connect Ferret-v2 to potential applications in human–computer collaboration?
+2405.11145v4,How could Ferret’s region highlighting help humans verify or correct model outputs?
+2405.11145v4,What do the authors see as the long-term vision for grounded multimodal models like Ferret-v2?
+2405.11145v4,How do the authors motivate the need for a model like Ferret in the introduction
+2405.11145v4,What user facing problems are they trying to solve with grounded vision language models
+2405.11145v4,Why is simple text only output from a VLM not enough for some applications
+2405.11145v4,How do the authors define region level grounding in this work
+2405.11145v4,What kinds of region based tasks are used to benchmark Ferret such as pointing and describing
+2405.11145v4,How does Ferret differ from caption only models in terms of output format
+2405.11145v4,How do the authors handle the fact that bounding boxes are continuous while tokens are discrete
+2405.11145v4,What encoding scheme is used to turn image regions into something the language model can process
+2405.11145v4,Does Ferret use absolute pixel coordinates or normalized coordinates and how
+2405.11145v4,How are region tokens interleaved with text tokens during training
+2405.11145v4,How does the vision encoder produce features that are linked to specific regions
+2405.11145v4,What kind of feature pooling or projection is applied to region features
+2405.11145v4,How is positional information about regions preserved in the model
+2405.11145v4,What base language model does Ferret v2 build upon
+2405.11145v4,What is the approximate number of parameters in Ferret v2
+2405.11145v4,How does Ferret v2’s scale compare to other popular open source VLMs
+2405.11145v4,What pretraining objectives are used for Ferret before task specific fine tuning
+2405.11145v4,What mixture of datasets is used for pretraining grounded abilities
+2405.11145v4,How do they mix grounded data and pure text conversational data during training
+2405.11145v4,What strategies do they use to avoid catastrophic forgetting of language skills
+2405.11145v4,How do they construct instruction like prompts for grounding tasks
+2405.11145v4,What is an example of a prompt that asks Ferret to answer and highlight a region
+2405.11145v4,How does the model know when to output region tokens versus plain text tokens
+2405.11145v4,What decoding strategy is used at inference time for mixed text and region outputs
+2405.11145v4,How do they evaluate whether the predicted region is correct for a referring expression
+2405.11145v4,What intersection over union thresholds are used for localization metrics if specified
+2405.11145v4,What metric is used to evaluate grounded captioning quality
+2405.11145v4,How do they combine localization metrics with caption quality when comparing models
+2405.11145v4,On which referring expression benchmark does Ferret v2 show the biggest gain
+2405.11145v4,How much does Ferret v2 improve over the original Ferret on referring expression tasks
+2405.11145v4,How much improvement does Ferret v2 show on grounded captioning tasks over non grounded baselines
+2405.11145v4,How does Ferret v2 perform on general VQA style benchmarks compared to models without grounding
+2405.11145v4,How does Ferret v2 perform in zero shot settings on unseen grounding benchmarks
+2405.11145v4,What is the trend when the amount of grounding supervision is gradually reduced
+2405.11145v4,What happens to localization accuracy when grounding losses are removed entirely
+2405.11145v4,What happens to caption accuracy when grounding supervision is removed
+2405.11145v4,Do the authors report any tradeoff between grounding quality and pure language performance
+2405.11145v4,What qualitative examples are used to showcase Ferret’s region highlighting abilities
+2405.11145v4,In those examples how does Ferret behave when asked to describe a very small object
+2405.11145v4,How does Ferret deal with two similar objects when the text refers to only one of them
+2405.11145v4,What errors does Ferret make in cases where multiple plausible regions exist
+2405.11145v4,How do the authors visualize the attention or selection over regions when Ferret answers
+2405.11145v4,What patterns in attention maps suggest that Ferret is truly focusing on the described object
+2405.11145v4,How does Ferret handle questions involving spatial relations like left of and behind
+2405.11145v4,What examples show Ferret correctly grounding complex spatial relationships
+2405.11145v4,What kinds of spatial relation errors still occur in the qualitative analysis
+2405.11145v4,How does Ferret handle questions that require counting objects in different regions
+2405.11145v4,What is the observed behavior when descriptions include both attributes and relations
+2405.11145v4,How well does Ferret handle fine grained attributes such as detailed clothing or small accessories
+2405.11145v4,What benchmarks are used to test compositional reasoning about objects and attributes
+2405.11145v4,How does Ferret perform on these compositional benchmarks compared to other models
+2405.11145v4,What data augmentations are applied to images or regions during training if described
+2405.11145v4,How do they handle overlapping or nested regions when preparing training targets
+2405.11145v4,What limitations do they mention about the coverage of region annotations in existing datasets
+2405.11145v4,How might incomplete region annotations affect Ferret’s training and evaluation
+2405.11145v4,What do they say about domain shifts between training datasets and evaluation benchmarks
+2405.11145v4,How robust is Ferret to variations in image style such as cartoons versus photos if tested
+2405.11145v4,Do the authors evaluate Ferret on any out of distribution grounding tasks
+2405.11145v4,What open questions remain about generalizing grounding to entirely new domains
+2405.11145v4,How might Ferret v2 be scaled to even larger model sizes according to the authors
+2405.11145v4,What limits do they mention in terms of compute cost for training Ferret v2
+2405.11145v4,How does inference latency of Ferret compare to similar sized VLMs without grounding
+2405.11145v4,What design choices are made to keep inference cost manageable
+2405.11145v4,What potential optimizations do the authors suggest for faster region based inference
+2405.11145v4,How does Ferret handle prompts that involve editing or transforming specific regions conceptually
+2405.11145v4,What applications like image editing or region based commands do they mention as use cases
+2405.11145v4,How might Ferret’s region outputs be integrated into robotics pipelines
+2405.11145v4,What role could Ferret play in human computer interaction scenarios with pointing and clicking
+2405.11145v4,How do the authors compare explicit region outputs to soft attention heatmaps
+2405.11145v4,Why do they argue that discrete region outputs improve interpretability for users
+2405.11145v4,What limitations remain in terms of human interpretability of Ferret’s internal reasoning
+2405.11145v4,What concerns about bias or unfairness do they raise for grounded models if any
+2405.11145v4,How might grounding help detect or reduce some forms of bias in vision language systems
+2405.11145v4,What evaluation gaps do they identify for grounded models beyond current benchmarks
+2405.11145v4,What kinds of new benchmarks would better test grounded communication skills
+2405.11145v4,How could future datasets capture more diverse and realistic grounding instructions
+2405.11145v4,What do the authors see as the most important applications of Ferret v2 in the near term
+2405.11145v4,How could Ferret v2 assist users who need to inspect complicated images in detail
+2405.11145v4,How might Ferret v2 support accessibility use cases such as describing regions to visually impaired users
+2405.11145v4,How could grounded outputs from Ferret be used for educational or explanatory tools
+2405.11145v4,What do the authors say about combining Ferret with external retrieval systems
+2405.11145v4,How might Ferret use retrieved documents to improve grounded explanations in complex scenes
+2405.11145v4,What training tricks do they mention for keeping region supervision stable during fine tuning
+2405.11145v4,How do they manage the balance between general language abilities and grounding performance
+2405.11145v4,What lessons do they draw about multi task training for grounded and non grounded objectives
+2405.11145v4,How does Ferret v2 compare with models that use detection backbones for region proposals
+2405.11145v4,What are the pros and cons of the end to end approach that Ferret takes
+2405.11145v4,What examples show Ferret v2 outperforming earlier detection based grounding models
+2405.11145v4,In what scenarios do detection based approaches still have advantages if any
+2405.11145v4,How do the authors measure the faithfulness of Ferret’s explanations
+2405.11145v4,What evidence suggests that Ferret is not just hallucinating region outputs
+2405.11145v4,How do they test whether the highlighted region actually influences the textual answer
+2405.11145v4,What remains unclear about the link between internal reasoning and region outputs
+2405.11145v4,What kinds of user studies could be run to test whether grounded outputs build trust
+2405.11145v4,What directions for better explanation evaluation are suggested in the discussion
+2405.11145v4,How does Ferret handle questions that explicitly mention multiple regions in a single prompt
+2405.11145v4,What capabilities does Ferret show for comparing two different regions in one answer
+2405.11145v4,What failure modes appear when there are many similar objects in crowded scenes
+2405.11145v4,What is an example where Ferret v2 gives a convincing but wrong grounded explanation
+2405.11145v4,How do the authors think future models could reduce such failure cases
+2405.11145v4,What is the role of instruction tuning in making Ferret follow grounding commands reliably
+2405.11145v4,What kinds of instruction formats worked best in their experiments
+2405.11145v4,How does Ferret v2 behave when instructions are vague or underspecified about regions
+2405.11145v4,Does Ferret ever abstain from grounding when it is not confident and if so how
+2405.11145v4,How might ideas from abstention be combined with Ferret style grounding for safety
+2405.11145v4,What insights from Ferret v2 could be applied to video grounding models
+2405.11145v4,How might region level tokens be extended to temporal segments in video
+2405.11145v4,What challenges do the authors foresee in scaling this architecture to long videos
+2405.11145v4,What is the overall summary of why grounding matters for robust multimodal AI according to this paper
+2405.11145v4,If you had to explain Ferret v2 to a non expert in one sentence based on the paper what would you say
+2405.11145v4,Which result or figure most strongly convinces you that grounding improves utility
+2405.11145v4,What remaining questions about grounded multimodal models does this paper leave you with
+2405.11145v4,How could you combine the ideas from CARA and Ferret to design a cautious grounded system
+2405.11145v4,What experiments would you run to test such a combined system on ambiguous but grounded questions
+2405.11145v4,What is one concrete real world product that could be built using Ferret v2 as a core component
+2405.11145v4,What considerations about privacy and safety arise when using grounded models like Ferret on user images
+2405.11145v4,How might user feedback on highlighted regions be used to further fine tune Ferret
+2405.11145v4,What long term vision do the authors sketch for grounded vision language models beyond this work

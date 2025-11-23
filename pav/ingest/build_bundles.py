@@ -1,13 +1,28 @@
 # pav/ingest/build_bundles.py
-from typing import List, Dict, Any
-from ..types import Bundle
-from ..config import CONF
+
+from typing import Any, Dict, List, Sequence
+
 from .discourse_units import build_ccus
 
-def build(elements: List[Dict[str,Any]], doc_id: str) -> List[Bundle]:
+
+def build(elements: Sequence[Any], doc_id: str) -> List[Dict[str, Any]]:
     """
-    CCU mode: build context-complete units from section structure.
+    Backwards-compatible entrypoint used by cli.py.
+
+    Takes raw unstructured elements + doc_id and returns a flat list of
+    Pinecone-ready vectors:
+
+        {
+            "id": str,
+            "values": List[float],   # Gemini embedding
+            "metadata": Dict[str, Any]
+        }
+
+    All the heavy lifting (CCUs + image/table children + embeddings)
+    happens inside discourse_units.build_ccus().
     """
-    if not CONF.CCU_ENABLE:
-        raise RuntimeError("CCU mode is disabled. Set CCU_ENABLE=true in .env or config.py")
     return build_ccus(elements, doc_id)
+
+
+# Optional alias if you ever want to import build_bundles elsewhere
+build_bundles = build

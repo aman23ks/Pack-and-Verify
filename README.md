@@ -1,7 +1,7 @@
 # Pack-and-Verify (Quick POC)
 
 Free-tier POC: Unstructured (hi_res) to segment PDFs (text/tables/images),
-Gemini for vision+QA+embeddings, Pinecone for vector search, and a budgeted
+OpenAi for vision+QA+embeddings, Pinecone for vector search, and a budgeted
 packer (gain-per-token + MMR).
 
 ## Quickstart
@@ -12,3 +12,9 @@ cp .env.example .env   # paste your keys
 mkdir -p data/papers   # drop 3–5 PDFs here
 python cli.py ingest data/papers
 python cli.py ask "What does Table 2 report?"
+```
+
+## To Run Automation Test
+```bash
+python batch_eval.py Automation.csv Automation_results.csv
+```

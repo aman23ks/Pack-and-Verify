@@ -112,13 +112,8 @@ def pack(
     where `base_score` is the Pinecone similarity score, and the penalty
     discourages adding chunks that are too redundant with already-selected ones.
 
-    Args:
-        matches: list of Pinecone matches (ScoredVector) or dicts.
-        budget_tokens: maximum total tokens allowed in the packed context.
-        lambda_penalty: weight for cosine-similarity redundancy penalty.
-
-    Returns:
-        (chosen_matches, used_tokens)
+    If lambda_penalty <= 0, this reduces to a simple top-k-under-budget
+    selection with NO redundancy penalty.
     """
     if budget_tokens <= 0 or not matches:
         return [], 0
@@ -159,7 +154,7 @@ def pack(
     selected: List[Dict[str, Any]] = []
     used_tokens = 0
 
-    # Greedy selection with redundancy penalty
+    # Greedy selection with optional redundancy penalty
     while True:
         best_item = None
         best_effective = None
@@ -189,7 +184,7 @@ def pack(
 
             # Compute max cosine similarity to already-selected items
             penalty_sim = 0.0
-            if selected and cand["vec"]:
+            if lambda_penalty > 0 and selected and cand["vec"]:
                 sims = [
                     _cosine(cand["vec"], s["vec"])
                     for s in selected
@@ -200,7 +195,7 @@ def pack(
 
             effective = base - lambda_penalty * penalty_sim
 
-            if best_item is None or effective > best_effective:
+            if best_item is None or best_effective is None or effective > best_effective:
                 best_item = cand
                 best_effective = effective
 
@@ -216,7 +211,7 @@ def pack(
         # Recompute debug metrics for printing
         base = best_item["score"]
         penalty_sim = 0.0
-        if selected and best_item["vec"]:
+        if lambda_penalty > 0 and selected and best_item["vec"]:
             sims = [
                 _cosine(best_item["vec"], s["vec"])
                 for s in selected

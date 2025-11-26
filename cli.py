@@ -11,6 +11,9 @@ from pav.clients.retrieval.packer import pack, render_pack
 from pav.qa.answer import answer
 import json
 from pav.clients.rerank_local import local_rerank, RERANK_AVAILABLE
+import os
+import time
+
 
 
 def ingest(folder: str):
@@ -107,14 +110,38 @@ def ingest(folder: str):
 
 
 def ask(question: str, budget: int, namespace: str | None = None):
-    # Pass namespace through to Pinecone search
-    matches = search(question, top_k=80, namespace=namespace)
-    # Optional: local rerank
-    matches = local_rerank(question, matches)
+    # Env toggles:
+    # USE_RERANK=0 → disable local cross-encoder rerank
+    # USE_PENALTY=0 → disable cosine diversity penalty in pack()
+    # PROFILE=1     → print timing info per call
+    use_rerank = os.getenv("USE_RERANK", "1") != "0"
+    use_penalty = os.getenv("USE_PENALTY", "1") != "0"
+    do_profile = os.getenv("PROFILE", "0") == "1"
 
-    chosen, used = pack(matches, budget)
+    t0 = time.perf_counter()
+
+    # 1) Retrieve from Pinecone
+    matches = search(question, top_k=80, namespace=namespace)
+
+    # 2) Optional: local rerank
+    if use_rerank and RERANK_AVAILABLE:
+        matches = local_rerank(question, matches)
+
+    # 3) Pack with or without redundancy penalty
+    lambda_penalty = 0.3 if use_penalty else 0.0
+    chosen, used = pack(matches, budget, lambda_penalty=lambda_penalty)
+
+    # 4) Build context and answer
     pack_text = render_pack(chosen)
     ans = answer(pack_text, question)
+
+    if do_profile:
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        print(
+            f"[PROFILE] use_rerank={use_rerank} "
+            f"use_penalty={use_penalty} "
+            f"budget={budget} tokens≈{used} time_ms={elapsed_ms:.1f}"
+        )
 
     # Keep the prints for interactive use
     print(f"\n[PACK TOKENS ≈ {used}]")
@@ -122,8 +149,6 @@ def ask(question: str, budget: int, namespace: str | None = None):
 
     # IMPORTANT: return the answer so batch_eval can capture it
     return ans
-
-
 
 def main():
     if len(sys.argv) < 2:

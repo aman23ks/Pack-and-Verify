@@ -109,7 +109,7 @@ def ingest(folder: str):
         print(f"   Bundles: {len(bundles)}, Indexed: {len(vecs)}")
 
 
-def ask(question: str, budget: int, namespace: str | None = None):
+def ask(question: str, budget: int, namespace: "str | None" = None):
     # Env toggles:
     # USE_RERANK=0 → disable local cross-encoder rerank
     # USE_PENALTY=0 → disable cosine diversity penalty in pack()

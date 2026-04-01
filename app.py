@@ -257,8 +257,16 @@ def list_documents():
     }
 
 
+@app.get("/")
+def root_health_check():
+    """Simple root health check so Render's port scanner finds us immediately."""
+    return {"status": "alive", "service": "Pack-and-Verify"}
+
+
 # ── Entrypoint ───────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
+    # Render provides the port via an environment variable
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=True)
+    # Note: 'reload=True' is great for local dev but should be False on Render
+    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
